@@ -70,10 +70,10 @@ shocks_last_60,0.0029590950205811437
 dow,0.0026971258351954
 tdays_to_month_end,0.0013759973656617018
 nfp_day,0.0005676684327446808
+fomc_today,0.0
 nfp_today,0.0
 ecb_today,0.0
-fomc_today,0.0
-cpi_today,0.0
 any_event_today,0.0
-events_today_count,0.0
+cpi_today,0.0
 shock_lag1,0.0
+events_today_count,0.0
