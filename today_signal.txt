@@ -1,0 +1,19 @@
+FXBOT SIGNAL - 2026-11-15 20:12 UTC
+================================================
+Date: 2026-11-13
+Model: Ensemble (average)
+Prob UP tomorrow: 40.6%
+Signal: SELL
+Confidence: HIGH
+Action: Go SHORT EUR/USD tomorrow
+Shock recent (last 5d): No
+
+Details:
+- 55.7% RF accuracy historically (2022-2026)
+- 55.9% recent accuracy (2025+)
+- Top driver: btc_ret_1
+- Buy & Hold benchmark: -1% over same period
+
+Paper trade: Logistic +9.8% vs BH 6.2% in 2025+ (PASS)
+
+This is paper-trade only, not financial advice.
