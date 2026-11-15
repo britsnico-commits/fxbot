@@ -11,11 +11,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt websocket-client
       - run: python predictor_v3.py
       - run: python check.py
       - run: python paper_trade_v2.py
       - run: python today_signal.py
+      - run: python live_bot_deriv.py --live --once
+        env:
+          DERIV_API_TOKEN: ${{ secrets.DERIV_API_TOKEN }}
       - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
