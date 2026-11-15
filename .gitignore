@@ -1,0 +1,7 @@
+﻿__pycache__/
+*.pyc
+statements/
+.env
+*.txt
+!requirements.txt
+!today_signal.txt
