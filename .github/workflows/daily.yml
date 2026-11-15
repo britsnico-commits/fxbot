@@ -1,46 +1,24 @@
-name: FXBOT Daily Run
-
+﻿name: FXBOT Daily Run
 on:
   schedule:
-    # Runs every day at 06:00 UTC (08:00 SA time)
-    - cron: '0 6 * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
-
 jobs:
   daily:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
-      - name: Run predictor + check + paper trade
-        env:
-          # Add your FRED key in GitHub Secrets if you want (optional)
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: |
-          python predictor_v3.py
-          python check.py
-          python paper_trade_v2.py
-          python today_signal.py || echo "today_signal optional"
-          echo "Daily run completed $(date -u)"
-
-      - name: Commit updated results
-        run: |
-          git config --global user.email "bot@fxbot.com"
-          git config --global user.name "FXBOT Daily Bot"
-          # Force add results even if gitignored for cloud display
-          git add -f results/ || true
-          git add -f today_signal.txt today_signal.py || true
-          git add -f live_dashboard.png || true
-          git commit -m "Daily auto-update $(date -u +%Y-%m-%d)" || echo "No changes"
-          git push || echo "Push failed - check repo permissions"
-
+      - run: pip install -r requirements.txt
+      - run: python predictor_v3.py
+      - run: python check.py
+      - run: python paper_trade_v2.py
+      - run: python today_signal.py
+      - run: |
+          git config --global user.email 'bot@fxbot.com'
+          git config --global user.name 'FXBOT Daily Bot'
+          git add -f results/ today_signal.txt
+          git commit -m 'Auto-update 15min'
+          git push
