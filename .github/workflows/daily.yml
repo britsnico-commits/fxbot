@@ -24,4 +24,5 @@ jobs:
           git config --global user.name 'FXBOT Daily Bot'
           git add -f results/ today_signal.txt
           git commit -m 'Auto-update 15min' || echo "No changes"
-          git push || echo "Push skipped - check permissions"
+          git pull --rebase || true
+          git push || echo "Push skipped"
