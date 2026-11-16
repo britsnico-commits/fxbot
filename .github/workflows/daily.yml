@@ -20,10 +20,11 @@ jobs:
         env:
           DERIV_API_TOKEN: ${{ secrets.DERIV_API_TOKEN }}
       - run: python log_live.py || echo "Logger failed but continue"
+      - run: python live_accuracy.py || echo "Accuracy check"
       - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
-          git add -f results/ today_signal.txt
+          git add -f results/ today_signal.txt predictions.csv
           git commit -m 'Auto-update 15min' || echo "No changes"
           git pull --rebase || true
           git push || echo "Push skipped"
