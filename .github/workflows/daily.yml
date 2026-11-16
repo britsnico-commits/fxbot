@@ -24,7 +24,8 @@ jobs:
       - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
-          git add -f results/ today_signal.txt predictions.csv
+          git add -f results/ today_signal.txt || true
+          git add -f predictions.csv || echo "No predictions.csv yet"
           git commit -m 'Auto-update 15min' || echo "No changes"
           git pull --rebase || true
           git push || echo "Push skipped"
