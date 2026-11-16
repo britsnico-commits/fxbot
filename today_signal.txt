@@ -1,8 +1,8 @@
-FXBOT SIGNAL - 2026-11-16 03:49 UTC
+FXBOT SIGNAL - 2026-11-16 05:15 UTC
 ================================================
 Date: 2026-11-16
 Model: Ensemble (average)
-Prob UP tomorrow: 48.7%
+Prob UP tomorrow: 47.3%
 Signal: HOLD
 Confidence: LOW
 Action: Stay FLAT - no edge
