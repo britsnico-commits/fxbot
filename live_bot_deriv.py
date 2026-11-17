@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 import csv
@@ -35,8 +36,6 @@ if signal_path.exists():
     m_sig = re.search(r"Signal:\s*(BUY|SELL|HOLD)", txt, re.I)
     if m_sig:
         signal = m_sig.group(1).upper()
-else:
-    log("today_signal.txt not found")
 
 LOW, HIGH = 45.0, 55.0
 if prob < LOW:
@@ -49,7 +48,7 @@ else:
 log(f"Tuned Rule {LOW}/{HIGH} => Trade Signal: {trade_signal} at {prob}%")
 
 if trade_signal == "HOLD":
-    log(f"HOLD because {prob}% inside {LOW}-{HIGH}% - no trade")
+    log(f"HOLD because {prob}% inside {LOW}-{HIGH}%")
     try:
         Path("results").mkdir(exist_ok=True)
         p = Path("results/deriv_trades.csv")
@@ -59,7 +58,7 @@ if trade_signal == "HOLD":
             if is_new:
                 w.writerow(["timestamp","symbol","type","signal","stake","duration","status","pnl"])
             w.writerow([now.isoformat(), "frxEURUSD", "HOLD", f"{signal} {prob}%", 0, "-", f"SKIPPED - {prob}% inside {LOW}-{HIGH}", 0])
-        log("Logged HOLD to deriv_trades.csv")
+        log("Logged HOLD")
     except Exception as e:
         log(f"CSV log failed: {e}")
     exit(0)
@@ -69,81 +68,109 @@ try:
     log("websocket-client imported ok")
 except Exception as e:
     log(f"websocket-client missing: {e}")
-    log(f"[DRY RUN] Would place {trade_signal} frxEURUSD 1d $10 at {prob}%")
     exit(0)
 
 contract_type = "PUT" if trade_signal == "SELL" else "CALL"
 log(f"Placing order: {contract_type} frxEURUSD 1d $10 at {prob}%")
 
-ws_url = "wss://ws.binaryws.com/websockets/v3?app_id=1089"
+endpoints = [
+    "wss://ws.derivws.com/websockets/v3?app_id=1089",
+    "wss://ws.binaryws.com/websockets/v3?app_id=1089",
+    "wss://ws.deriv.com/websockets/v3?app_id=1089"
+]
 
-try:
-    ws = websocket.create_connection(ws_url, timeout=20)
-    log("WS connected")
-    ws.send(json.dumps({"authorize": TOKEN}))
-    resp = json.loads(ws.recv())
-    log(f"Authorize resp: {resp}")
-    if "error" in resp:
-        log(f"Auth failed: {resp['error']}")
-        ws.close()
-        exit(0)
-    log("Deriv authorized OK")
+success = False
+for ws_url in endpoints:
+    try:
+        log(f"Trying WS: {ws_url}")
+        ws = websocket.create_connection(ws_url, timeout=25, header=["Origin: https://app.deriv.com", "User-Agent: Mozilla/5.0"])
+        log(f"WS connected to {ws_url}")
 
-    proposal_req = {
-        "proposal": 1,
-        "amount": 10,
-        "basis": "stake",
-        "contract_type": contract_type,
-        "currency": "USD",
-        "duration": 1,
-        "duration_unit": "d",
-        "symbol": "frxEURUSD"
-    }
-    ws.send(json.dumps(proposal_req))
-    proposal_resp = json.loads(ws.recv())
-    log(f"Proposal resp: {proposal_resp}")
+        ws.send(json.dumps({"authorize": TOKEN}))
+        resp = json.loads(ws.recv())
+        log(f"Authorize resp: {str(resp)[:300]}")
+        if "error" in resp:
+            log(f"Auth failed: {resp['error']}")
+            ws.close()
+            continue
+        log("Deriv authorized OK")
 
-    if "error" in proposal_resp:
-        log(f"Proposal error: {proposal_resp['error']}")
-        ws.close()
-        exit(0)
+        proposal_req = {
+            "proposal": 1,
+            "amount": 10,
+            "basis": "stake",
+            "contract_type": contract_type,
+            "currency": "USD",
+            "duration": 1,
+            "duration_unit": "d",
+            "symbol": "frxEURUSD"
+        }
+        ws.send(json.dumps(proposal_req))
+        proposal_resp = json.loads(ws.recv())
+        log(f"Proposal resp: {str(proposal_resp)[:500]}")
 
-    if "proposal" not in proposal_resp:
-        log(f"No proposal in response: {proposal_resp}")
-        ws.close()
-        exit(0)
+        if "error" in proposal_resp:
+            log(f"Proposal error: {proposal_resp['error']}")
+            ws.close()
+            continue
 
-    proposal_id = proposal_resp["proposal"]["id"]
-    log(f"Proposal ID: {proposal_id}")
+        if "proposal" not in proposal_resp:
+            log(f"No proposal: {proposal_resp}")
+            ws.close()
+            continue
 
-    buy_req = {"buy": proposal_id, "price": 10}
-    ws.send(json.dumps(buy_req))
-    buy_resp = json.loads(ws.recv())
-    log(f"Buy resp: {buy_resp}")
+        proposal_id = proposal_resp["proposal"]["id"]
+        log(f"Proposal ID: {proposal_id}")
 
-    if "error" in buy_resp:
-        log(f"Buy error: {buy_resp['error']}")
-    else:
-        log(f"[LIVE] Deriv order placed: {contract_type} frxEURUSD 1d $10 at {prob}%")
+        buy_req = {"buy": proposal_id, "price": 10}
+        ws.send(json.dumps(buy_req))
+        buy_resp = json.loads(ws.recv())
+        log(f"Buy resp: {str(buy_resp)[:500]}")
+
+        if "error" in buy_resp:
+            log(f"Buy error: {buy_resp['error']}")
+            ws.close()
+            continue
+        else:
+            log(f"[LIVE] Deriv order placed: {contract_type} frxEURUSD 1d $10 at {prob}% - via {ws_url}")
+            try:
+                Path("results").mkdir(exist_ok=True)
+                p = Path("results/deriv_trades.csv")
+                is_new = not p.exists()
+                with open(p, "a", newline="") as f:
+                    w = csv.writer(f)
+                    if is_new:
+                        w.writerow(["timestamp","symbol","type","signal","stake","duration","status","pnl"])
+                    w.writerow([now.isoformat(), "frxEURUSD", contract_type, f"{trade_signal} {prob}%", 10, "1d", "OPEN", 0])
+                log("Logged LIVE trade")
+            except Exception as e:
+                log(f"CSV log failed: {e}")
+            ws.close()
+            success = True
+            break
+
+    except Exception as e:
+        log(f"Endpoint {ws_url} failed: {e}")
         try:
-            Path("results").mkdir(exist_ok=True)
-            p = Path("results/deriv_trades.csv")
-            is_new = not p.exists()
-            with open(p, "a", newline="") as f:
-                w = csv.writer(f)
-                if is_new:
-                    w.writerow(["timestamp","symbol","type","signal","stake","duration","status","pnl"])
-                w.writerow([now.isoformat(), "frxEURUSD", contract_type, f"{trade_signal} {prob}%", 10, "1d", "OPEN", 0])
-            log("Logged LIVE trade to deriv_trades.csv")
-        except Exception as e:
-            log(f"CSV log failed: {e}")
+            ws.close()
+        except:
+            pass
+        time.sleep(2)
+        continue
 
-    ws.close()
-    log("WS closed")
+if not success:
+    log("All endpoints failed - will retry next run. Saving as DRY RUN for now.")
+    try:
+        Path("results").mkdir(exist_ok=True)
+        p = Path("results/deriv_trades.csv")
+        is_new = not p.exists()
+        with open(p, "a", newline="") as f:
+            w = csv.writer(f)
+            if is_new:
+                w.writerow(["timestamp","symbol","type","signal","stake","duration","status","pnl"])
+            w.writerow([now.isoformat(), "frxEURUSD", contract_type, f"{trade_signal} {prob}%", 10, "1d", "DRY_RUN_520", 0])
+        log("Logged DRY RUN due to 520")
+    except Exception as e:
+        log(f"CSV log failed: {e}")
 
-except Exception as e:
-    log(f"Order failed: {e}")
-    import traceback
-    traceback.print_exc()
-
-log("live_bot_deriv.py done - 45/55 threshold - websocket-client version")
+log("live_bot_deriv.py done - 45/55 threshold - multi-endpoint")
