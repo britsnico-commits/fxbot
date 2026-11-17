@@ -1,28 +1,27 @@
 name: FXBOT Daily Run
 on:
   schedule:
-    - cron: '*/15 * * * *'
+        - cron: '*/15 * * * *'
   workflow_dispatch:
 jobs:
   daily:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+            - uses: actions/checkout@v4
+            - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: python predictor_v3.py
-      - run: python check.py
-      - run: python paper_trade_v2.py
-      - run: python today_signal.py
-      - run: python log_live.py || echo "Logger failed"
-      - run: python live_accuracy.py || echo "Accuracy check"
-      - run: |
+            - run: pip install -r requirements.txt
+            - run: python predictor_v3.py
+            - run: python check.py
+            - run: python paper_trade_v2.py
+            - run: python today_signal.py
+            - run: python log_live.py || echo "Logger failed"
+            - run: python live_accuracy.py || echo "Accuracy check"
+            - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
-          git add -f results/ today_signal.txt || true
-          git add -f predictions.csv || echo "No predictions.csv"
+          git add -f results/ today_signal.txt predictions.csv || true
           git commit -m 'Auto-update 15min' || echo "No changes"
           git pull --rebase || true
           git push || echo "Push skipped"
