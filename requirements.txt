@@ -6,3 +6,4 @@ scipy
 matplotlib
 streamlit
 websockets
+websocket-client
