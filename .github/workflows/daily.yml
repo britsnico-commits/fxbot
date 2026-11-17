@@ -12,9 +12,16 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install Cloudflare WARP to bypass Deriv 520
-        uses: fscarmen/warp-on@v1
-        with:
-          stack: dual
+        run: |
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+          sudo apt-get update
+          sudo apt-get install -y cloudflare-warp
+          warp-cli --accept-tos register || true
+          warp-cli --accept-tos set-mode warp || true
+          warp-cli --accept-tos connect || true
+          sleep 5
+          curl -s https://ifconfig.me || true
       - run: pip install -r requirements.txt websocket-client
       - run: python predictor_v3.py
       - run: python check.py
