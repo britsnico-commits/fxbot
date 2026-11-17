@@ -1,4 +1,4 @@
-FXBOT SIGNAL - 2026-11-17 11:37 UTC
+FXBOT SIGNAL - 2026-11-17 12:41 UTC
 ================================================
 Date: 2026-11-17
 Model: Ensemble (average)
