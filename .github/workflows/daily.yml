@@ -11,32 +11,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install Cloudflare WARP to bypass Deriv 520
-        run: |
-          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
-          sudo apt-get update
-          sudo apt-get install -y cloudflare-warp
-          warp-cli --accept-tos register || true
-          warp-cli --accept-tos set-mode warp || true
-          warp-cli --accept-tos connect || true
-          sleep 5
-          curl -s https://ifconfig.me || true
-      - run: pip install -r requirements.txt websocket-client
+      - run: pip install -r requirements.txt
       - run: python predictor_v3.py
       - run: python check.py
       - run: python paper_trade_v2.py
       - run: python today_signal.py
-      - run: python live_bot_deriv.py --live --once
-        env:
-          DERIV_API_TOKEN: ${{ secrets.DERIV_API_TOKEN }}
-      - run: python log_live.py || echo "Logger failed but continue"
+      - run: python log_live.py || echo "Logger failed"
       - run: python live_accuracy.py || echo "Accuracy check"
       - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
           git add -f results/ today_signal.txt || true
-          git add -f predictions.csv || echo "No predictions.csv yet"
+          git add -f predictions.csv || echo "No predictions.csv"
           git commit -m 'Auto-update 15min' || echo "No changes"
           git pull --rebase || true
           git push || echo "Push skipped"
