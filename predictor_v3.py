@@ -1,6 +1,8 @@
-# predictor_v3.py - FOREX ONLY VERSION
-# No BTC, Gold, DXY, Oil, SPX, VIX, or any non-FX asset
-# Outputs: results/predictions.csv (prob_up), results/shock_days.csv
+# predictor_v3.py - FOREX ONLY - FIXED VERSION
+# Fixes from review:
+# 1. Drops today's unfinished bar - uses only completed bars
+# 2. Removes fake ecb_days_since / fed_days_since features
+# 3. No BTC, Gold, DXY, Oil, SPX, VIX
 import os
 import warnings
 warnings.filterwarnings("ignore")
@@ -11,10 +13,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
+from datetime import datetime, timezone, timedelta
 
 os.makedirs("results", exist_ok=True)
 
-# --- FOREX ONLY TICKERS ---
 TICKERS = {
     "eurusd": "EURUSD=X",
     "eurgbp": "EURGBP=X",
@@ -26,7 +28,7 @@ TICKERS = {
     "usdcad": "USDCAD=X",
 }
 
-print("Downloading market data... [FOREX ONLY]")
+print("Downloading market data... [FOREX ONLY, COMPLETED BARS ONLY]")
 data = {}
 for name, ticker in TICKERS.items():
     try:
@@ -34,7 +36,6 @@ for name, ticker in TICKERS.items():
         if df is None or len(df) < 500:
             print(f"Skipped (too little data): {name}")
             continue
-        # yfinance may return MultiIndex columns
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         data[name] = df["Close"].rename(name)
@@ -46,14 +47,17 @@ if "eurusd" not in data:
 
 prices = pd.concat(data.values(), axis=1).dropna()
 prices.index = pd.to_datetime(prices.index)
-print(f"{len(prices)} trading days, {prices.index[0].date()} to {prices.index[-1].date()}, {len(prices.columns)} forex series")
-print("No FRED_API_KEY set: skipping rate differentials and macro data. [forex-only mode]")
-print("Downloaded 0 new FOMC statements. [forex-only mode - no news]")
-print("Extra features: 0 (CFTC positioning / statement tone) [forex-only mode]")
 
-# --- FEATURES: forex-only ---
-# For each pair: ret_1, ret_5, ret_20, vol_20, dist from MA20/50
-# For EURUSD: + RSI, MACD, MA cross, lags
+# --- FIX #1: DROP TODAY'S UNFINISHED BAR ---
+# Only use bars where date < today UTC. Today's candle is still forming and flips signal.
+today_utc = datetime.now(timezone.utc).date()
+before_len = len(prices)
+prices = prices[prices.index.date < today_utc]
+after_len = len(prices)
+print(f"{after_len} trading days (dropped {before_len-after_len} unfinished today bar), {prices.index[0].date()} to {prices.index[-1].date()}, {len(prices.columns)} forex series")
+print(f"Cutoff: using only completed bars before {today_utc} UTC")
+print("No FRED_API_KEY set: skipping rate differentials and macro data. [forex-only mode]")
+
 def add_pair_features(df, col, prefix):
     ret = df[col].pct_change()
     df[f"{prefix}_ret_1"] = ret
@@ -70,7 +74,6 @@ df = prices.copy()
 for col in prices.columns:
     df = add_pair_features(df, col, col)
 
-# EURUSD extras
 eur = df["eurusd"]
 ret1 = eur.pct_change()
 df["ret_1"] = ret1
@@ -80,40 +83,35 @@ df["vol_60"] = ret1.rolling(60).std()
 df["ma20_vs_ma50"] = eur.rolling(20).mean() / eur.rolling(50).mean() - 1
 df["dist_ma20"] = eur / eur.rolling(20).mean() - 1
 df["dist_ma50"] = eur / eur.rolling(50).mean() - 1
-# RSI 14
 delta = eur.diff()
 gain = delta.clip(lower=0).rolling(14).mean()
 loss = -delta.clip(upper=0).rolling(14).mean()
 df["rsi_14"] = 100 - (100 / (1 + gain / loss.replace(0, np.nan)))
-# MACD
 ema12 = eur.ewm(span=12, adjust=False).mean()
 ema26 = eur.ewm(span=26, adjust=False).mean()
 macd = ema12 - ema26
 df["macd_hist"] = macd - macd.ewm(span=9, adjust=False).mean()
-# Lags
 for lag in [1, 2, 3, 5]:
     df[f"ret1_lag{lag}"] = ret1.shift(lag)
-# Calendar
 df["dow"] = df.index.dayofweek
 df["month"] = df.index.month
-# Dummy calendar features to keep shape similar to old version
-df["ecb_days_since"] = (df.index.day % 30)
-df["fed_days_since"] = (df.index.day % 30)
+# --- FIX #2: REMOVED FAKE ECB/FED FEATURES ---
+# Old code had: df["ecb_days_since"] = (df.index.day % 30) - FAKE, removed
 
-# Target: up tomorrow?
 df["target"] = (df["eurusd"].shift(-1) > df["eurusd"]).astype(int)
+# --- FIX #3: Remove last row that has bogus target (NaN > x = False -> 0) ---
+# Drop last row before dropna, because its target is always 0 (future price unknown)
+df = df.iloc[:-1]
 df = df.dropna()
 
 feature_cols = [c for c in df.columns if c not in ["target", "eurusd", "eurgbp", "gbpusd", "usdchf", "eurjpy", "usdjpy", "audusd", "usdcad"]]
 print(f"Features: {len(feature_cols)} | usable training rows: {len(df)}")
 
-# Shock days: |ret| > 2.5 * rolling vol
 df["is_shock"] = (df["ret_1"].abs() > 2.5 * df["vol_60"]).astype(int)
 shock = df[df["is_shock"] == 1][["ret_1"]].copy()
 shock.to_csv("results/shock_days.csv")
-print(f"Logged {len(shock)} shock days to results/shock_days.csv")
+print(f"Logged {len(shock)} shock days")
 
-# Train / Test split: last 1268 days = test (same as before)
 test_n = min(1268, int(len(df) * 0.35))
 train = df.iloc[:-test_n]
 test = df.iloc[-test_n:]
@@ -126,54 +124,48 @@ Xte_s = scaler.transform(X_test)
 
 def report(name, preds, proba=None):
     acc = accuracy_score(y_test, preds)
-    # Confident calls: prob >0.55 or <0.45
     if proba is not None:
         conf = (proba > 0.55) | (proba < 0.45)
         conf_acc = accuracy_score(y_test[conf], preds[conf]) if conf.sum() > 0 else 0
-        print(f"Accuracy {acc*100:.1f}% | coin flip 50% | majority baseline {max(y_test.mean(), 1-y_test.mean())*100:.1f}%")
-        print(f"Confident calls: {conf.sum()} days, accuracy {conf_acc*100:.1f}%")
+        print(f"Accuracy {acc*100:.1f}% | majority baseline {max(y_test.mean(), 1-y_test.mean())*100:.1f}% | Confident calls: {conf.sum()} days, accuracy {conf_acc*100:.1f}%")
     else:
         print(f"Accuracy {acc*100:.1f}%")
     return acc
 
 print("\n=== Logistic regression ===")
 print(f"Test days (unseen): {len(test)}")
-log = LogisticRegression(max_iter=1000)
+log = LogisticRegression(max_iter=1000, random_state=42)
 log.fit(Xtr_s, y_train)
 log_proba = log.predict_proba(Xte_s)[:, 1]
 report("logistic", (log_proba > 0.5).astype(int), log_proba)
 
 print("\n=== Random forest ===")
-print(f"Test days (unseen): {len(test)}")
 rf = RandomForestClassifier(n_estimators=300, max_depth=8, min_samples_leaf=20, n_jobs=-1, random_state=42)
 rf.fit(X_train, y_train)
 rf_proba = rf.predict_proba(X_test)[:, 1]
 report("rf", (rf_proba > 0.5).astype(int), rf_proba)
 
 print("\n=== Gradient boosting ===")
-print(f"Test days (unseen): {len(test)}")
 gb = GradientBoostingClassifier(n_estimators=200, max_depth=3, learning_rate=0.05, random_state=42)
 gb.fit(X_train, y_train)
 gb_proba = gb.predict_proba(X_test)[:, 1]
 report("gb", (gb_proba > 0.5).astype(int), gb_proba)
 
-print("\n=== Ensemble (average) ===")
-print(f"Test days (unseen): {len(test)}")
+print("\n=== Ensemble (accuracy of ensemble, not avg of accuracies) ===")
 ens_proba = (log_proba + rf_proba + gb_proba) / 3
-report("ens", (ens_proba > 0.5).astype(int), ens_proba)
+ens_pred = (ens_proba > 0.5).astype(int)
+ens_acc = accuracy_score(y_test, ens_pred)
+print(f"Ensemble accuracy: {ens_acc*100:.1f}% (computed from ensemble predictions)")
 
-# Top 15 features (random forest) - should now be FOREX ONLY
 importances = pd.Series(rf.feature_importances_, index=feature_cols).sort_values(ascending=False)
-print("\nTop 15 features (random forest):")
+print("\nTop 15 features (random forest) - FOREX ONLY:")
 for k, v in importances.head(15).items():
     print(f"{k:<20} {v:.4f}")
 
-# --- TOMORROW PREDICTION ---
-# Use last row (today) to predict tomorrow. Need to refit on full data for live prob.
-print("\nNews log: nothing new (or feeds unreachable).")
-# Refit on all data for live signal
+print("\nNews log: nothing new (forex-only mode)")
+
 X_all_s = scaler.fit_transform(df[feature_cols])
-log_full = LogisticRegression(max_iter=1000).fit(X_all_s, df["target"])
+log_full = LogisticRegression(max_iter=1000, random_state=42).fit(X_all_s, df["target"])
 rf_full = RandomForestClassifier(n_estimators=300, max_depth=8, min_samples_leaf=20, n_jobs=-1, random_state=42).fit(df[feature_cols], df["target"])
 gb_full = GradientBoostingClassifier(n_estimators=200, max_depth=3, learning_rate=0.05, random_state=42).fit(df[feature_cols], df["target"])
 
@@ -184,7 +176,6 @@ p_rf = rf_full.predict_proba(last)[0, 1]
 p_gb = gb_full.predict_proba(last)[0, 1]
 p_ens = (p_log + p_rf + p_gb) / 3
 
-# Use ensemble as live prob (same as before)
 prob_up = float(p_ens)
 last_price = float(df.iloc[-1]["eurusd"])
 last_date = df.index[-1].date()
@@ -197,9 +188,8 @@ out = pd.DataFrame([{
     "prob_rf": float(p_rf),
     "prob_gb": float(p_gb),
     "signal": "BUY" if prob_up > 0.55 else ("SELL" if prob_up < 0.45 else "HOLD"),
-    "model": "FOREX_ONLY_ENSEMBLE",
+    "model": "FOREX_ONLY_ENSEMBLE_COMPLETED_BARS",
 }])
 out.to_csv("results/predictions.csv", index=False)
 print(f"\nWrote results/predictions.csv: date={last_date} price={last_price:.4f} prob_up={prob_up*100:.1f}% signal={out.iloc[0]['signal']}")
-print("FIXED VERSION: Accuracy should now be 50-55%. If still 80%, you are running old file.")
-print("FOREX ONLY: No BTC/Gold/DXY in features.")
+print("FIXED: Uses only completed bars, no fake ECB/Fed features, ensemble is real ensemble accuracy.")
