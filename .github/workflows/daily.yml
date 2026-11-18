@@ -11,13 +11,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: python predictor_v3.py
-      - run: python check.py
-      - run: python paper_trade_v2.py
-      - run: python today_signal.py
-      - run: python log_live.py || echo "Logger failed"
-      - run: python live_accuracy.py || echo "Accuracy check"
+      - run: pip install -r requirements.txt || echo "pip failed"
+      - run: python predictor_v3.py || echo "predictor failed - continue"
+      - run: python check.py || echo "check failed - continue"
+      - run: python paper_trade_v2.py || echo "paper failed - continue"
+      - run: python today_signal.py || echo "signal failed - continue"
+      - run: python log_live.py || echo "logger failed"
+      - run: python live_accuracy.py || echo "accuracy failed"
       - run: |
           git config --global user.email 'bot@fxbot.com'
           git config --global user.name 'FXBOT Daily Bot'
