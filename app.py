@@ -1,20 +1,23 @@
-# app.py - CANIC FXBOT - Colour Dashboard
-# Forex-only, 45/55 rule, ADX filter
+# app.py - CANIC FXBOT - Fixed Contrast Version
+# Light background, dark text OUTSIDE cards, white text INSIDE dark cards only
 import os
 import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="CANIC FXBOT - Paper Trading", layout="wide", page_icon="📈")
 
-# --- COLOUR THEME ---
+# --- FIXED CSS: DO NOT force all text white ---
 st.markdown("""
 <style>
-    .main { background-color: #0f172a; }
-    .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
-    h1, h2, h3, p, span, div { color: #f1f5f9 !important; }
+    .block-container { padding-top: 1.2rem; padding-bottom: 1rem; }
+    /* Outside cards: keep Streamlit default dark text on light bg */
+    h1, h2, h3 { color: #0f172a !important; }
+    p, span, div, label { color: #0f172a; }
+    /* Inside dark cards: force white */
+    .big-card, .big-card * { color: #ffffff !important; }
     .big-card {
         border-radius: 16px; padding: 18px 20px; margin-bottom: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.18);
     }
     .card-buy { background: linear-gradient(135deg, #065f46, #10b981); }
     .card-sell { background: linear-gradient(135deg, #7f1d1d, #ef4444); }
@@ -23,8 +26,8 @@ st.markdown("""
     .card-green { background: linear-gradient(135deg, #065f46, #059669); }
     .card-red { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
     .card-blue { background: linear-gradient(135deg, #1e40af, #3b82f6); }
-    .label { font-size: 13px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
-    .big-num { font-size: 42px; font-weight: 800; line-height: 1.1; margin: 4px 0; }
+    .label { font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
+    .big-num { font-size: 40px; font-weight: 800; line-height: 1.1; margin: 4px 0; }
     .sub { font-size: 14px; opacity: 0.9; }
     .badge {
         display: inline-block; padding: 4px 12px; border-radius: 20px;
@@ -33,14 +36,17 @@ st.markdown("""
     .badge-green { background: #10b981; }
     .badge-orange { background: #f59e0b; }
     .badge-red { background: #ef4444; }
-    .badge-grey { background: #64748b; }
-    [data-testid="stDataFrame"] { background: #1e293b; border-radius: 12px; }
-    .stProgress > div > div > div > div { background: #3b82f6; }
+    /* Tables: keep dark text, light bg - readable */
+    [data-testid="stDataFrame"] { background: #ffffff; border-radius: 12px; }
+    [data-testid="stDataFrame"] * { color: #0f172a !important; }
+    /* Section headings: dark, readable */
+    .section-title { color: #0f172a !important; font-size: 22px; font-weight: 700; margin: 18px 0 8px 0; }
+    .caption-dark { color: #475569 !important; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='margin-bottom:4px;'>📈 CANIC FXBOT <span style='font-size:18px; opacity:0.7;'>— Paper Trading on LIVE Data</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='opacity:0.7; margin-bottom:18px;'>Forex-only • EUR/USD • 1 trade / day • 45/55 Rule • ADX Filter</p>", unsafe_allow_html=True)
+st.markdown("<h1>📈 CANIC FXBOT <span style='font-size:18px; color:#64748b;'>— Paper Trading on LIVE Data</span></h1>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748b;'>Forex-only • EUR/USD • 1 trade / day • 45/55 Rule • ADX Filter</p>", unsafe_allow_html=True)
 
 def load_csv(path):
     try:
@@ -72,7 +78,21 @@ signal_df = load_csv("results/today_signal.csv")
 pred_df = load_csv("results/predictions.csv")
 trades = load_csv("results/paper_trades.csv")
 live = load_csv("results/live_prices.csv")
+# Fallback: try other live file names
+if len(live) == 0:
+    for alt in ["results/live_price_points.csv", "results/live_price.csv", "results/prices.csv"]:
+        live = load_csv(alt)
+        if len(live) > 0:
+            break
 acc = load_csv("results/live_accuracy.csv")
+
+# --- FIX: Live points count - use accuracy log if live file empty ---
+live_count = len(live)
+if live_count == 0 and len(acc) > 0 and "live_points" in acc.columns:
+    try:
+        live_count = int(acc.iloc[-1]["live_points"])
+    except Exception:
+        pass
 
 prob, signal, adx, adx_note, source, sig_date, price, raw_signal = 0.0, "HOLD", 0.0, "", "", "", 0.0, ""
 if len(signal_df) > 0:
@@ -103,7 +123,7 @@ elif len(pred_df) > 0:
     except Exception: price = 0.0
     source = "PREDICTOR_ONLY"
 
-# --- TOP SIGNAL CARD - COLOURED BY SIGNAL ---
+# --- TOP SIGNAL CARD ---
 card_class = "card-buy" if signal == "BUY" else ("card-sell" if signal == "SELL" else "card-hold")
 emoji = "🟢 BUY" if signal == "BUY" else ("🔴 SELL" if signal == "SELL" else "🟡 HOLD")
 adx_badge = "badge-green" if adx >= 20 else "badge-orange"
@@ -134,8 +154,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Prob bar - visual gauge
-st.caption("Prob Gauge — <45% SELL | 45-55% HOLD | >55% BUY")
+st.markdown("<p style='color:#475569; font-size:13px;'>Prob Gauge — &lt;45% SELL | 45-55% HOLD | &gt;55% BUY</p>", unsafe_allow_html=True)
 st.progress(min(max(prob/100, 0), 1.0))
 
 # --- BALANCE ROW ---
@@ -155,7 +174,7 @@ with c4:
     st.markdown(f"""<div class="big-card card-blue"><div class="label">📊 Trades Closed</div><div class="big-num">{trades_closed}</div><div class="sub">{len(trades)} total • 1/day max</div></div>""", unsafe_allow_html=True)
 
 # --- EQUITY ---
-st.markdown("### 📈 Equity Curve — Are We Winning?")
+st.markdown("<div class='section-title'>📈 Equity Curve — Are We Winning?</div>", unsafe_allow_html=True)
 if len(trades) > 0 and "pnl" in trades.columns:
     equity = [100.0]
     for _, r in trades.iterrows():
@@ -167,10 +186,10 @@ if len(trades) > 0 and "pnl" in trades.columns:
     st.line_chart(pd.DataFrame({"Balance": equity}), height=220)
 else:
     st.line_chart(pd.DataFrame({"Balance": [100.0,100.0]}), height=220)
-st.caption("Start $100 fake. If line goes up over 1 month, daily model works.")
+st.markdown("<p class='caption-dark'>Start $100 fake. If line goes up over 1 month, daily model works.</p>", unsafe_allow_html=True)
 
 # --- TRADES ---
-st.markdown("### 📋 Paper Trade History")
+st.markdown("<div class='section-title'>📋 Paper Trade History</div>", unsafe_allow_html=True)
 if len(trades) > 0:
     show = trades.copy()
     cols = [c for c in ["timestamp","signal","prob","price","stake","type","pnl","status"] if c in show.columns]
@@ -178,23 +197,25 @@ if len(trades) > 0:
 else:
     st.markdown("<div class='big-card card-dark'>No trades yet. Bot opens 1 trade/day when Prob &gt;55% or &lt;45% and ADX ≥20.</div>", unsafe_allow_html=True)
 
-# --- LIVE POINTS ---
-pct = len(live)/2880*100 if len(live)>0 else 0
-st.markdown(f"### 🔴 Live Price Points: {len(live)} / 2880 ({pct:.1f}% of 1 month)")
-st.progress(min(len(live)/2880, 1.0))
+# --- LIVE POINTS - FIXED COUNT ---
+pct = live_count/2880*100 if live_count>0 else 0
+st.markdown(f"<div class='section-title'>🔴 Live Price Points: {live_count} / 2880 ({pct:.1f}% of 1 month)</div>", unsafe_allow_html=True)
+st.progress(min(live_count/2880, 1.0))
 if len(live) > 0:
     show_live = live.tail(10).copy()
     cols_live = [c for c in ["timestamp","price"] if c in show_live.columns]
     st.dataframe(show_live[cols_live] if cols_live else show_live, use_container_width=True)
+elif live_count > 0:
+    st.markdown(f"<p class='caption-dark'>Collecting live points — {live_count} points logged (from accuracy log). Live price table file not found, but count is correct.</p>", unsafe_allow_html=True)
 else:
     st.write("No live points yet.")
 
 # --- ACCURACY ---
-st.markdown("### 🧪 Live Accuracy Log")
+st.markdown("<div class='section-title'>🧪 Live Accuracy Log</div>", unsafe_allow_html=True)
 if len(acc) > 0:
     st.dataframe(acc, use_container_width=True)
 else:
     st.write("No accuracy log yet.")
 
 st.divider()
-st.caption("CANIC FXBOT | Forex-only | EUR/USD | 1 trade/day max | $10-$20 stake | Kill-switch if balance < $70 | No trade weekends / NFP Friday | ADX <20 = HOLD")
+st.markdown("<p class='caption-dark'>CANIC FXBOT | Forex-only | EUR/USD | 1 trade/day max | $10-$20 stake | Kill-switch if balance &lt; $70 | No trade weekends / NFP Friday | ADX &lt;20 = HOLD</p>", unsafe_allow_html=True)
