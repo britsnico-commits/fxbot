@@ -8,15 +8,14 @@ Path("results").mkdir(exist_ok=True)
 p = Path("results/paper_trades.csv")
 now = datetime.now(timezone.utc)
 today = now.strftime("%Y-%m-%d")
-weekday = now.weekday()  # 0=Mon, 5=Sat, 6=Sun
+weekday = now.weekday()
 
-# --- 1. WEEKEND FILTER ---
+# Weekend filter
 if weekday >= 5:
-    print(f"Weekend {now} - market closed, no trade")
+    print(f"Weekend {now} - no trade")
     exit(0)
 
-# --- 2. KILL-SWITCH: Stop if Fake Balance < $70 ---
-# Start $100, stop at -30%
+# Kill-switch
 if p.exists():
     try:
         df_check = pd.read_csv(p)
@@ -24,22 +23,19 @@ if p.exists():
             closed = df_check[df_check['status'].astype(str).str.contains('CLOSED')]
             total_pnl = float(closed['pnl'].sum()) if len(closed) > 0 else 0
             balance = 100 + total_pnl
-            print(f"Current Fake Balance: ${balance:.2f}")
+            print(f"Balance: ${balance:.2f}")
             if balance < 70:
-                print(f"KILL-SWITCH TRIGGERED: Balance ${balance:.2f} < $70 - STOPPING ALL TRADES")
+                print(f"KILL-SWITCH: Balance ${balance:.2f} < $70 - STOP")
                 exit(0)
     except Exception as e:
         print(f"Kill-switch check failed: {e}")
 
-# --- 3. NFP FILTER: First Friday of month = no trade (coin flip day) ---
-# NFP is first Friday, 14:30 SA time. Skip whole day to avoid fake loss.
-if weekday == 4:  # Friday
-    # Check if first Friday: day <=7
-    if now.day <= 7:
-        print(f"NFP Friday {today} - skipping trade (high volatility)")
-        exit(0)
+# NFP Friday filter
+if weekday == 4 and now.day <= 7:
+    print(f"NFP Friday {today} - skipping")
+    exit(0)
 
-# --- Normal 1-trade-per-day logic ---
+# Read signal
 txt = Path("today_signal.txt").read_text() if Path("today_signal.txt").exists() else ""
 m = re.search(r"Prob UP[^0-9]*([0-9.]+)%", txt, re.I)
 prob = float(m.group(1)) if m else 50.0
@@ -49,14 +45,32 @@ sig = ms.group(1).upper() if ms else "HOLD"
 LOW, HIGH = 45.0, 55.0
 trade_sig = "SELL" if prob < LOW else "BUY" if prob > HIGH else "HOLD"
 
-# Dedupe - 1 trade per day max
+# --- POSITION SIZING ---
+# Distance from 50% = confidence
+# Prob 55-60 = low confidence -> $10
+# Prob 60-65 = medium -> $15
+# Prob 65+ = high -> $20
+# For SELL, use 100-prob
+conf_prob = prob if trade_sig == "BUY" else (100 - prob if trade_sig == "SELL" else 50)
+if trade_sig == "HOLD":
+    stake = 0
+elif conf_prob >= 65:
+    stake = 20
+elif conf_prob >= 60:
+    stake = 15
+else:
+    stake = 10
+
+print(f"Signal {trade_sig} at {prob}% -> Confidence {conf_prob:.1f}% -> Stake ${stake}")
+
+# Dedupe - 1 per day
 if p.exists():
     try:
         df = pd.read_csv(p)
         if len(df) > 0:
             df['date'] = pd.to_datetime(df['timestamp']).dt.strftime("%Y-%m-%d")
             if today in df['date'].values:
-                print(f"Already have trade for {today} - skipping duplicate")
+                print(f"Already have trade for {today} - skipping")
                 df = df.drop_duplicates(subset=['date'], keep='first')
                 df = df.drop(columns=['date'])
                 df.to_csv(p, index=False)
@@ -80,9 +94,9 @@ if trade_sig in ["BUY","SELL"]:
         w = csv.writer(f)
         if is_new:
             w.writerow(["timestamp","signal","prob","price","stake","type","pnl","status"])
-        w.writerow([now.isoformat(), trade_sig, prob, price, 10, "1d", 0, "OPEN"])
-    print(f"Paper trade logged: {trade_sig} {prob}% at {price} for {today}")
+        w.writerow([now.isoformat(), trade_sig, prob, price, stake, "1d", 0, "OPEN"])
+    print(f"Logged: {trade_sig} {prob}% stake ${stake} at {price}")
 else:
     print(f"HOLD {prob}% - no trade")
 
-print("paper_trade_v2 done - kill-switch + weekend + NFP filters active")
+print("paper_trade_v2 done - position sizing active")
