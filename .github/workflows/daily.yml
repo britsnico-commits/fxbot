@@ -13,6 +13,7 @@ jobs:
           python-version: '3.11'
       - run: pip install -r requirements.txt || echo "pip failed"
       - run: python predictor_v3.py || echo "predictor failed - continue"
+      - run: python predictor_compare.py || echo "compare failed - continue"
       - run: python check.py || echo "check failed - continue"
       - run: python paper_trade_v2.py || echo "paper failed - continue"
       - run: python today_signal.py || echo "signal failed - continue"
