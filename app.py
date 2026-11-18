@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - With Signal History + ADX Trend
+# app.py - CANIC FXBOT - With Kill-Switch Light + Signal History + ADX Trend + Countdown
 import os
 import pandas as pd
 import streamlit as st
@@ -26,6 +26,7 @@ st.markdown("""
     .card-red { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
     .card-blue { background: linear-gradient(135deg, #1e40af, #3b82f6); }
     .card-purple { background: linear-gradient(135deg, #5b21b6, #8b5cf6); }
+    .card-yellow { background: linear-gradient(135deg, #92400e, #f59e0b); }
     .label { font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
     .big-num { font-size: 40px; font-weight: 800; line-height: 1.1; margin: 4px 0; }
     .sub { font-size: 14px; opacity: 0.9; }
@@ -161,6 +162,42 @@ with c3:
 with c4:
     st.markdown(f"""<div class="big-card card-blue"><div class="label">📊 Trades Closed</div><div class="big-num">{trades_closed}</div><div class="sub">{len(trades)} total • 1/day max</div></div>""", unsafe_allow_html=True)
 
+# --- NEW: KILL-SWITCH LIGHT ---
+# Rules: Start $100, Kill-switch at $70 (stop trading), Warning at $85
+KILL = 70.0
+WARN = 85.0
+buffer_amt = balance - KILL
+if balance < KILL:
+    ks_class = "card-red"
+    ks_emoji = "🔴 STOPPED"
+    ks_text = f"Balance ${balance:.2f} is BELOW kill-switch ${KILL:.0f} — Bot has STOPPED trading. Reset needed."
+    ks_sub = "No new trades will open until you reset."
+elif balance < WARN:
+    ks_class = "card-yellow"
+    ks_emoji = "🟡 WARNING"
+    ks_text = f"Balance ${balance:.2f} — Only ${buffer_amt:.2f} buffer left before kill-switch at ${KILL:.0f}"
+    ks_sub = f"1 more loss (${10:.0f}) = ${balance-10:.2f}. 2 more losses = STOP. Trade carefully."
+else:
+    ks_class = "card-green"
+    ks_emoji = "🟢 SAFE"
+    ks_text = f"Balance ${balance:.2f} — ${buffer_amt:.2f} buffer above kill-switch at ${KILL:.0f}"
+    ks_sub = f"Can survive {int(buffer_amt // 10)} more $10 losses before stopping. Safe to trade."
+
+# Progress: 0% = $70 (dead), 100% = $120 (great) - clamp
+ks_pct = max(0.0, min(1.0, (balance - KILL) / (120 - KILL)))
+st.markdown(f"<div class='section-title'>🛡️ Kill-Switch — How Safe Are We?</div>", unsafe_allow_html=True)
+st.markdown(f"""
+<div class="big-card {ks_class}">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+        <div><div class="label">Kill-Switch Status</div><div class="big-num">{ks_emoji}</div><div class="sub">{ks_text}</div></div>
+        <div style="text-align:right;"><div class="label">Buffer Left</div><div class="big-num">${buffer_amt:.2f}</div><div class="sub">Kill at $70 • Start $100</div></div>
+    </div>
+    <div style="margin-top:10px; font-size:13px; opacity:0.9;">{ks_sub}</div>
+</div>
+""", unsafe_allow_html=True)
+st.markdown("<p style='color:#475569; font-size:13px;'>Kill-Switch Gauge — Red zone = $70 STOP &nbsp;|&nbsp; Yellow = $70-$85 WARNING &nbsp;|&nbsp; Green = $85+ SAFE</p>", unsafe_allow_html=True)
+st.progress(ks_pct)
+
 # --- OPEN TRADE COUNTDOWN ---
 open_trade = None
 if len(trades) > 0 and "status" in trades.columns:
@@ -196,33 +233,24 @@ if open_trade is not None:
 else:
     st.markdown("<p class='caption-dark'>No open trade — next trade opens when Prob &gt;55% or &lt;45% and ADX ≥20.</p>", unsafe_allow_html=True)
 
-# --- NEW: SIGNAL HISTORY + ADX TREND ---
+# --- SIGNAL HISTORY + ADX TREND ---
 st.markdown("<div class='section-title'>📊 Signal History — Is Confidence Rising or Falling?</div>", unsafe_allow_html=True)
 if len(hist) > 0:
-    # Last 14 days
     hist_show = hist.tail(14).copy()
-    # Prob chart with 45/55 bands
     prob_df = pd.DataFrame({"Prob": hist_show["prob_up"].values})
-    base = alt.Chart(prob_df.reset_index()).mark_line(color="#2563eb", strokeWidth=3, point=True).encode(
-        x=alt.X("index", title="Day (old → new)"),
-        y=alt.Y("Prob", scale=alt.Scale(domain=[35, 65]))
-    ).properties(height=200)
-    # 55 line + 45 line
+    base = alt.Chart(prob_df.reset_index()).mark_line(color="#2563eb", strokeWidth=3, point=True).encode(x=alt.X("index", title="Day (old → new)"), y=alt.Y("Prob", scale=alt.Scale(domain=[35, 65]))).properties(height=200)
     rule = alt.Chart(pd.DataFrame({"y": [55, 45]})).mark_rule(color="#f59e0b", strokeDash=[4,4]).encode(y="y")
     st.altair_chart(base + rule, use_container_width=True)
-    # Text summary
     try:
         probs = hist_show["prob_up"].values
         first_p = float(probs[0]); last_p = float(probs[-1])
         trend = "📈 Rising" if last_p > first_p else ("📉 Falling" if last_p < first_p else "➖ Flat")
-        st.markdown(f"<p class='caption-dark'>Last {len(probs)} days: {first_p:.1f}% → {last_p:.1f}% — {trend} &nbsp;|&nbsp; Orange lines = 45% / 55% trade thresholds. Above top line = BUY zone, below bottom = SELL zone.</p>", unsafe_allow_html=True)
-        # Show table
+        st.markdown(f"<p class='caption-dark'>Last {len(probs)} days: {first_p:.1f}% → {last_p:.1f}% — {trend} &nbsp;|&nbsp; Orange lines = 45% / 55% thresholds.</p>", unsafe_allow_html=True)
         st.dataframe(hist_show[["date","prob_up","signal","adx","price"]], use_container_width=True)
     except Exception:
         pass
 else:
-    st.markdown("<p class='caption-dark'>History starts building from today. Run Daily Run tomorrow and you’ll see 2 points, then a line forming over the week. Today: Prob {:.1f}% ADX {:.1f}</p>".format(prob, adx), unsafe_allow_html=True)
-    # Show today's single point so it doesn't look empty
+    st.markdown("<p class='caption-dark'>History starts building from today. Run Daily Run tomorrow and you’ll see 2 points. Today: Prob {:.1f}% ADX {:.1f}</p>".format(prob, adx), unsafe_allow_html=True)
     if prob > 0:
         st.altair_chart(alt.Chart(pd.DataFrame({"Prob": [prob]})).mark_point(color="#2563eb", size=100).encode(y=alt.Y("Prob", scale=alt.Scale(domain=[35,65]))).properties(height=150), use_container_width=True)
 
@@ -230,17 +258,14 @@ st.markdown("<div class='section-title'>🌊 ADX Trend — Is a Trend Building?<
 if len(hist) > 0 and "adx" in hist.columns:
     hist_adx = hist.tail(14).copy()
     adx_df = pd.DataFrame({"ADX": hist_adx["adx"].values})
-    adx_chart = alt.Chart(adx_df.reset_index()).mark_line(color="#059669", strokeWidth=3, point=True).encode(
-        x=alt.X("index", title="Day (old → new)"),
-        y=alt.Y("ADX", scale=alt.Scale(domain=[0, 35]))
-    ).properties(height=200)
+    adx_chart = alt.Chart(adx_df.reset_index()).mark_line(color="#059669", strokeWidth=3, point=True).encode(x=alt.X("index", title="Day (old → new)"), y=alt.Y("ADX", scale=alt.Scale(domain=[0, 35]))).properties(height=200)
     adx_line = alt.Chart(pd.DataFrame({"y": [20]})).mark_rule(color="#ef4444", strokeDash=[4,4]).encode(y="y")
     st.altair_chart(adx_chart + adx_line, use_container_width=True)
     try:
         adxs = hist_adx["adx"].values
         first_a = float(adxs[0]); last_a = float(adxs[-1])
         a_trend = "📈 Building toward trend" if last_a > first_a else ("📉 Getting choppier" if last_a < first_a else "➖ Flat")
-        st.markdown(f"<p class='caption-dark'>Last {len(adxs)} days: ADX {first_a:.1f} → {last_a:.1f} — {a_trend} &nbsp;|&nbsp; Red line = 20. Above = trade allowed, below = HOLD forced.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p class='caption-dark'>Last {len(adxs)} days: ADX {first_a:.1f} → {last_a:.1f} — {a_trend} &nbsp;|&nbsp; Red line = 20. Above = trade allowed.</p>", unsafe_allow_html=True)
     except Exception:
         pass
 else:
