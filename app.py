@@ -1,8 +1,8 @@
-# app.py - CANIC FXBOT - Full Version with Live EUR/USD Chart
-# Light bg, dark text outside cards, white text inside cards only
+# app.py - CANIC FXBOT - Full Version with Zoomed Charts
 import os
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 st.set_page_config(page_title="CANIC FXBOT - Paper Trading", layout="wide", page_icon="📈")
 
@@ -75,8 +75,8 @@ pred_df = load_csv("results/predictions.csv")
 trades = load_csv("results/paper_trades.csv")
 live = load_csv("results/live_prices.csv")
 if len(live) == 0:
-    for alt in ["results/live_price_points.csv", "results/live_price.csv", "results/prices.csv"]:
-        live = load_csv(alt)
+    for alt_path in ["results/live_price_points.csv", "results/live_price.csv", "results/prices.csv"]:
+        live = load_csv(alt_path)
         if len(live) > 0:
             break
 acc = load_csv("results/live_accuracy.csv")
@@ -85,6 +85,14 @@ live_count = len(live)
 if live_count == 0 and len(acc) > 0 and "live_points" in acc.columns:
     try:
         live_count = int(acc.iloc[-1]["live_points"])
+    except Exception:
+        pass
+# If accuracy log has higher count than live file (git reset case), use accuracy log
+if len(acc) > 0 and "live_points" in acc.columns:
+    try:
+        acc_max = int(acc["live_points"].max())
+        if acc_max > live_count:
+            live_count = acc_max
     except Exception:
         pass
 
@@ -167,7 +175,7 @@ with c3:
 with c4:
     st.markdown(f"""<div class="big-card card-blue"><div class="label">📊 Trades Closed</div><div class="big-num">{trades_closed}</div><div class="sub">{len(trades)} total • 1/day max</div></div>""", unsafe_allow_html=True)
 
-# --- LIVE EUR/USD CHART - OPTION 2 LIVELIER ---
+# --- LIVE EUR/USD CHART - ZOOMED ---
 st.markdown("<div class='section-title'>💹 Live EUR/USD — What Is It Doing Right Now?</div>", unsafe_allow_html=True)
 live_chart_ok = False
 try:
@@ -186,14 +194,21 @@ try:
         chg_emoji = "🟢" if chg >= 0 else "🔴"
         chg_word = "UP" if chg >= 0 else "DOWN"
         st.markdown(f"<p class='live-price'>EUR/USD Now: {last:.4f} &nbsp; {chg_emoji} {chg:+.4f} ({chg_pct:+.2f}% today) — {chg_word}</p>", unsafe_allow_html=True)
-        st.line_chart(pd.DataFrame({"EUR/USD": close.values}), height=280)
-        st.markdown("<p class='caption-dark'>Last 24h, 15-min prices. Refresh page for fresh price — no Daily Run needed.</p>", unsafe_allow_html=True)
+        # ZOOMED CHART - not 0 to 1.0
+        chart_df = pd.DataFrame({"EUR/USD": close.values})
+        ymin = float(chart_df["EUR/USD"].min()) - 0.0005
+        ymax = float(chart_df["EUR/USD"].max()) + 0.0005
+        chart = alt.Chart(chart_df.reset_index()).mark_line(color="#2563eb", strokeWidth=2).encode(
+            x=alt.X("index", title="15-min bars"),
+            y=alt.Y("EUR/USD", scale=alt.Scale(domain=[ymin, ymax]))
+        ).properties(height=280)
+        st.altair_chart(chart, use_container_width=True)
+        st.markdown("<p class='caption-dark'>Last 24h, 15-min prices. Zoomed to show real moves. Refresh page for fresh price — no Daily Run needed.</p>", unsafe_allow_html=True)
         live_chart_ok = True
 except Exception:
     live_chart_ok = False
 
 if not live_chart_ok:
-    # Fallback: your own collected points
     if len(live) > 0 and "price" in live.columns:
         try:
             last_p = float(live.iloc[-1]["price"])
@@ -204,12 +219,19 @@ if not live_chart_ok:
             st.markdown(f"<p class='live-price'>EUR/USD (from your bot): {last_p:.4f} &nbsp; {chg_e} {chg_p:+.4f} ({chg_pct_p:+.2f}% since start)</p>", unsafe_allow_html=True)
         except Exception:
             pass
-        st.line_chart(pd.DataFrame({"EUR/USD": live["price"].values}), height=280)
+        chart_df2 = pd.DataFrame({"EUR/USD": live["price"].values})
+        ymin2 = float(chart_df2["EUR/USD"].min()) - 0.0005
+        ymax2 = float(chart_df2["EUR/USD"].max()) + 0.0005
+        chart2 = alt.Chart(chart_df2.reset_index()).mark_line(color="#2563eb", strokeWidth=2).encode(
+            x=alt.X("index", title="Bot points"),
+            y=alt.Y("EUR/USD", scale=alt.Scale(domain=[ymin2, ymax2]))
+        ).properties(height=280)
+        st.altair_chart(chart2, use_container_width=True)
         st.markdown(f"<p class='caption-dark'>From your bot — {len(live)} points collected. Yahoo live feed was unreachable, showing bot data.</p>", unsafe_allow_html=True)
     else:
         st.write("No live chart data yet — run Daily Run once.")
 
-# --- EQUITY ---
+# --- EQUITY - ZOOMED ---
 st.markdown("<div class='section-title'>📈 Equity Curve — Are We Winning?</div>", unsafe_allow_html=True)
 if len(trades) > 0 and "pnl" in trades.columns:
     equity = [100.0]
@@ -219,10 +241,21 @@ if len(trades) > 0 and "pnl" in trades.columns:
                 equity.append(equity[-1] + float(r.get("pnl",0) or 0))
         except Exception: pass
     if len(equity)==1: equity=[100.0,100.0]
-    st.line_chart(pd.DataFrame({"Balance": equity}), height=220)
+    eq_df = pd.DataFrame({"Balance": equity})
+    # Zoom 90-120 so $8 win is visible, not flat on 0-100
+    eq_chart = alt.Chart(eq_df.reset_index()).mark_line(color="#059669", strokeWidth=3).encode(
+        x=alt.X("index", title="Closed trades"),
+        y=alt.Y("Balance", scale=alt.Scale(domain=[90, 120]))
+    ).properties(height=220)
+    st.altair_chart(eq_chart, use_container_width=True)
 else:
-    st.line_chart(pd.DataFrame({"Balance": [100.0,100.0]}), height=220)
-st.markdown("<p class='caption-dark'>Start $100 fake. If line goes up over 1 month, daily model works.</p>", unsafe_allow_html=True)
+    eq_df = pd.DataFrame({"Balance": [100.0, 100.0]})
+    eq_chart = alt.Chart(eq_df.reset_index()).mark_line(color="#059669", strokeWidth=3).encode(
+        x=alt.X("index", title="Closed trades"),
+        y=alt.Y("Balance", scale=alt.Scale(domain=[90, 120]))
+    ).properties(height=220)
+    st.altair_chart(eq_chart, use_container_width=True)
+st.markdown("<p class='caption-dark'>Start $100 fake. Zoomed 90-120 so small wins/losses are visible. If line goes up over 1 month, daily model works.</p>", unsafe_allow_html=True)
 
 # --- TRADES ---
 st.markdown("<div class='section-title'>📋 Paper Trade History</div>", unsafe_allow_html=True)
@@ -242,7 +275,7 @@ if len(live) > 0:
     cols_live = [c for c in ["timestamp","price"] if c in show_live.columns]
     st.dataframe(show_live[cols_live] if cols_live else show_live, use_container_width=True)
 elif live_count > 0:
-    st.markdown(f"<p class='caption-dark'>Collecting live points — {live_count} points logged (from accuracy log). Live price table file not found, but count is correct.</p>", unsafe_allow_html=True)
+    st.markdown(f"<p class='caption-dark'>Collecting live points — {live_count} points logged (from accuracy log). Live price table file was reset, but count is recovered.</p>", unsafe_allow_html=True)
 else:
     st.write("No live points yet.")
 
