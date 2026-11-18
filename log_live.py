@@ -1,4 +1,5 @@
 # log_live.py - Collects 1 live EUR/USD point every 15 min
+# FIXED: Never resets live_points to 1 if git overwrites the file
 # Writes BOTH results/live_prices.csv (table) and results/live_accuracy.csv (count)
 import os
 import time
@@ -9,7 +10,6 @@ from datetime import datetime, timezone
 os.makedirs("results", exist_ok=True)
 
 def get_price():
-    # Try 3 times, yfinance sometimes locks
     for i in range(3):
         try:
             df = yf.download("EURUSD=X", period="1d", interval="15m", auto_adjust=True, progress=False)
@@ -24,7 +24,6 @@ def get_price():
         except Exception as e:
             print(f"Attempt {i+1} failed: {e}")
             time.sleep(5)
-    # Fallback: try 1h interval
     try:
         df = yf.download("EURUSD=X", period="2d", interval="1h", auto_adjust=True, progress=False)
         if isinstance(df.columns, pd.MultiIndex):
@@ -46,23 +45,51 @@ if price is None:
 
 print(f"Live EUR/USD: {price:.4f} at {now}")
 
-# --- 1. Write live_prices.csv (the table your dashboard shows) ---
+# --- Get previous max from accuracy log BEFORE we overwrite anything ---
+acc_path = "results/live_accuracy.csv"
+prev_max = 0
+if os.path.exists(acc_path):
+    try:
+        acc_tmp = pd.read_csv(acc_path)
+        if "live_points" in acc_tmp.columns and len(acc_tmp) > 0:
+            prev_max = int(acc_tmp["live_points"].max())
+            print(f"Previous max live_points from accuracy log: {prev_max}")
+    except Exception as e:
+        print(f"Could not read prev accuracy log: {e}")
+
+# --- 1. Write live_prices.csv ---
 live_path = "results/live_prices.csv"
 if os.path.exists(live_path):
-    live = pd.read_csv(live_path)
+    try:
+        live = pd.read_csv(live_path)
+    except Exception:
+        live = pd.DataFrame(columns=["timestamp", "price"])
 else:
     live = pd.DataFrame(columns=["timestamp", "price"])
+
+# DETECT GIT RESET: if live file has 1 row but accuracy log says 47, git overwrote it
+was_reset = False
+if prev_max > 0 and len(live) < prev_max:
+    print(f"⚠️ Live file was reset by git ({len(live)} rows vs prev max {prev_max}) - recovering count")
+    was_reset = True
 
 # Dedupe: don't add same timestamp twice
 if len(live) == 0 or str(live.iloc[-1]["timestamp"]) != now:
     new_row = pd.DataFrame([{"timestamp": now, "price": price}])
     live = pd.concat([live, new_row], ignore_index=True)
     live.to_csv(live_path, index=False)
-    print(f"Wrote {live_path}: {len(live)} points")
+    print(f"Wrote {live_path}: {len(live)} rows in file")
 else:
     print("Duplicate timestamp - skipped")
 
-# --- 2. Update live_accuracy.csv (count + trades) ---
+# True live count for accuracy log: if reset, use prev_max + 1, else len(live)
+if was_reset:
+    live_count = prev_max + 1
+    print(f"Using recovered count: {live_count} (file has {len(live)} rows, but true count is {live_count})")
+else:
+    live_count = len(live)
+
+# --- 2. Update live_accuracy.csv ---
 trades = pd.DataFrame()
 if os.path.exists("results/paper_trades.csv"):
     try:
@@ -86,7 +113,6 @@ if len(trades) > 0 and "pnl" in trades.columns:
             pass
 win_rate = (wins/closed*100) if closed>0 else 0.0
 
-acc_path = "results/live_accuracy.csv"
 if os.path.exists(acc_path):
     acc = pd.read_csv(acc_path)
 else:
@@ -94,11 +120,11 @@ else:
 
 acc_row = pd.DataFrame([{
     "timestamp": now,
-    "live_points": len(live),
+    "live_points": live_count,
     "total_trades": total_trades,
     "win_rate_pct": round(win_rate,1),
     "total_pnl": round(total_pnl,2),
 }])
 acc = pd.concat([acc, acc_row], ignore_index=True)
 acc.to_csv(acc_path, index=False)
-print(f"Wrote {acc_path}: live_points={len(live)} trades={total_trades}")
+print(f"Wrote {acc_path}: live_points={live_count} trades={total_trades}")
