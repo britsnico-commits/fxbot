@@ -1,7 +1,11 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 statements/
 .env
 *.txt
 !requirements.txt
 !today_signal.txt
+!predictions.csv
+!results/
+!results/*.csv
+!results/*.txt
