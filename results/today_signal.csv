@@ -1,2 +1,2 @@
 date,pred_date,prob_up,prob,signal,raw_signal,rule,adx,adx_note,price,source
-2026-11-18 19:07,2026-11-16,50.7,50.7,HOLD,HOLD,45/55 Threshold,10.2,"CHOPPY, HOLD forced (was HOLD)",1.1025,PREDICTOR_FRESH
+2026-11-18 22:55,2026-11-16,50.7,50.7,HOLD,HOLD,45/55 Threshold,10.2,"CHOPPY, HOLD forced (was HOLD)",1.1025,PREDICTOR_FRESH
