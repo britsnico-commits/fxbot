@@ -9,97 +9,133 @@ warnings.filterwarnings("ignore")
 
 Path("results").mkdir(exist_ok=True)
 
-# --- Load data same as predictor_v3 ---
-try:
-    df = yf.download("EURUSD=X", period="5y", interval="1d", progress=False, auto_adjust=False)
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    df = df.dropna()
-    print(f"Loaded {len(df)} rows")
-except Exception as e:
-    print(f"Download failed: {e}")
-    exit(0)
+# --- FOREX ONLY - No BTC, No Gold, No DXY ---
+# All pairs are FX, same market, same hours
+tickers = {
+    "EURUSD": "EURUSD=X",
+    "EURGBP": "EURGBP=X",
+    "GBPUSD": "GBPUSD=X",
+    "USDCHF": "USDCHF=X",
+    "EURJPY": "EURJPY=X",
+    "USDJPY": "USDJPY=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDCAD": "USDCAD=X",
+}
 
-# --- Same 78-ish features as your v3 - simplified robust set ---
-df['ret_1'] = df['Close'].pct_change(1)
-df['ret_5'] = df['Close'].pct_change(5)
-df['ret_20'] = df['Close'].pct_change(20)
-df['btc_ret_1'] = df['ret_1']  # placeholder - your v3 uses BTC as top feature, keep ret_1 as proxy
-df['ma5'] = df['Close'].rolling(5).mean()
-df['ma20'] = df['Close'].rolling(20).mean()
-df['ma_ratio'] = df['Close'] / df['ma20']
-df['rsi'] = 100 - (100 / (1 + df['ret_1'].clip(lower=0).rolling(14).mean() / (df['ret_1'].clip(upper=0).abs().rolling(14).mean() + 1e-9)))
-df['vol'] = df['ret_1'].rolling(20).std()
-df['high_close'] = df['High'] / df['Close']
-df['low_close'] = df['Low'] / df['Close']
-df['target'] = (df['Close'].shift(-1) > df['Close']).astype(int)
+print("Downloading forex-only pairs...")
+data = {}
+for name, ticker in tickers.items():
+    try:
+        df = yf.download(ticker, period="5y", interval="1d", progress=False, auto_adjust=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        data[name] = df['Close']
+        print(f"{name}: {len(df)} rows")
+    except Exception as e:
+        print(f"{name} failed: {e}")
 
-features = ['ret_1','ret_5','ret_20','ma_ratio','rsi','vol','high_close','low_close']
+# Build main dataframe on EURUSD index
+df = pd.DataFrame(data)
+df = df.dropna()
+print(f"Combined forex df: {len(df)} rows")
+
+# --- FOREX-ONLY FEATURES ---
+# Each feature is a forex pair return - 100% forex
+df['eurusd_ret_1'] = df['EURUSD'].pct_change(1)
+df['eurusd_ret_5'] = df['EURUSD'].pct_change(5)
+df['eurusd_ret_20'] = df['EURUSD'].pct_change(20)
+df['eurgbp_ret_1'] = df['EURGBP'].pct_change(1)  # EUR strength vs GBP - replaces BTC
+df['gbpusd_ret_1'] = df['GBPUSD'].pct_change(1)  # GBP/USD correlation ~0.85 with EUR/USD
+df['usdchf_ret_1'] = df['USDCHF'].pct_change(1)  # Inverse to EUR/USD ~-0.9
+df['eurjpy_ret_1'] = df['EURJPY'].pct_change(1)  # EUR strength vs JPY
+df['usdjpy_ret_1'] = df['USDJPY'].pct_change(1)  # Risk sentiment inside FX
+df['audusd_ret_1'] = df['AUDUSD'].pct_change(1)  # Risk-on FX
+df['usdcad_ret_1'] = df['USDCAD'].pct_change(1)  # Oil / USD strength
+
+# Technicals from EURUSD only (still forex)
+df['ma_ratio'] = df['EURUSD'] / df['EURUSD'].rolling(20).mean()
+df['vol'] = df['eurusd_ret_1'].rolling(20).std()
+# RSI
+gain = df['eurusd_ret_1'].clip(lower=0).rolling(14).mean()
+loss = df['eurusd_ret_1'].clip(upper=0).abs().rolling(14).mean()
+df['rsi'] = 100 - (100 / (1 + gain / (loss + 1e-9)))
+
+# Target: EURUSD up tomorrow?
+df['target'] = (df['EURUSD'].shift(-1) > df['EURUSD']).astype(int)
+
+features = [
+    'eurusd_ret_1','eurusd_ret_5','eurusd_ret_20',
+    'eurgbp_ret_1','gbpusd_ret_1','usdchf_ret_1',
+    'eurjpy_ret_1','usdjpy_ret_1','audusd_ret_1','usdcad_ret_1',
+    'ma_ratio','vol','rsi'
+]
+
 df = df.dropna()
 X = df[features]
 y = df['target']
+print(f"Features: {features}")
+print(f"Training rows: {len(df)}")
 
-# Train on last 80%, test on last 20% for fair compare
 split = int(len(df)*0.8)
 X_train, X_test = X.iloc[:split], X.iloc[split:]
 y_train, y_test = y.iloc[:split], y.iloc[split:]
 
 results = {}
 
-# 1. Logistic (your current baseline)
+# 1. Logistic - baseline, forex only
 try:
     m = LogisticRegression(max_iter=1000)
     m.fit(X_train, y_train)
     acc = m.score(X_test, y_test)
     prob = float(m.predict_proba(X.iloc[[-1]])[0][1]*100)
-    results['Logistic'] = (acc, prob)
-    print(f"Logistic acc {acc:.3f} prob UP {prob:.1f}%")
+    results['Logistic_FX_Only'] = (acc, prob)
+    print(f"Logistic FX Only acc {acc:.3f} prob {prob:.1f}%")
 except Exception as e:
     print(f"Logistic failed: {e}")
 
-# 2. XGBoost
+# 2. XGBoost - forex only
 try:
     from xgboost import XGBClassifier
     m = XGBClassifier(n_estimators=200, max_depth=4, learning_rate=0.05, eval_metric='logloss', n_jobs=-1)
     m.fit(X_train, y_train)
     acc = m.score(X_test, y_test)
     prob = float(m.predict_proba(X.iloc[[-1]])[0][1]*100)
-    results['XGBoost'] = (acc, prob)
-    print(f"XGBoost acc {acc:.3f} prob UP {prob:.1f}%")
+    results['XGBoost_FX_Only'] = (acc, prob)
+    print(f"XGBoost FX Only acc {acc:.3f} prob {prob:.1f}%")
 except Exception as e:
     print(f"XGBoost failed: {e}")
 
-# 3. LightGBM
+# 3. LightGBM - forex only
 try:
     import lightgbm as lgb
     m = lgb.LGBMClassifier(n_estimators=200, max_depth=4, learning_rate=0.05, verbose=-1)
     m.fit(X_train, y_train)
     acc = m.score(X_test, y_test)
     prob = float(m.predict_proba(X.iloc[[-1]])[0][1]*100)
-    results['LightGBM'] = (acc, prob)
-    print(f"LightGBM acc {acc:.3f} prob UP {prob:.1f}%")
+    results['LightGBM_FX_Only'] = (acc, prob)
+    print(f"LightGBM FX Only acc {acc:.3f} prob {prob:.1f}%")
 except Exception as e:
     print(f"LightGBM failed: {e}")
 
-# 4. Ensemble XGBoost + LightGBM (best in literature)
-if 'XGBoost' in results and 'LightGBM' in results:
-    ens_acc = (results['XGBoost'][0] + results['LightGBM'][0]) / 2
-    ens_prob = (results['XGBoost'][1] + results['LightGBM'][1]) / 2
-    results['Ensemble_XGB_LGBM'] = (ens_acc, ens_prob)
-    print(f"Ensemble acc {ens_acc:.3f} prob UP {ens_prob:.1f}%")
+# 4. Ensemble
+if 'XGBoost_FX_Only' in results and 'LightGBM_FX_Only' in results:
+    ens_acc = (results['XGBoost_FX_Only'][0] + results['LightGBM_FX_Only'][0]) / 2
+    ens_prob = (results['XGBoost_FX_Only'][1] + results['LightGBM_FX_Only'][1]) / 2
+    results['Ensemble_FX_Only'] = (ens_acc, ens_prob)
+    print(f"Ensemble FX Only acc {ens_acc:.3f} prob {ens_prob:.1f}%")
 
-# 5. Random Forest (for regime filter)
+# 5. Random Forest
 try:
     m = RandomForestClassifier(n_estimators=200, max_depth=6, n_jobs=-1)
     m.fit(X_train, y_train)
     acc = m.score(X_test, y_test)
     prob = float(m.predict_proba(X.iloc[[-1]])[0][1]*100)
-    results['RandomForest'] = (acc, prob)
-    print(f"RF acc {acc:.3f} prob UP {prob:.1f}%")
+    results['RandomForest_FX_Only'] = (acc, prob)
+    print(f"RF FX Only acc {acc:.3f} prob {prob:.1f}%")
 except Exception as e:
     print(f"RF failed: {e}")
 
-# Save comparison
+# Save
 import csv
 from datetime import datetime, timezone
 p = Path("results/model_compare.csv")
@@ -112,4 +148,4 @@ with open(p, "a", newline="") as f:
         sig = "BUY" if prob>55 else "SELL" if prob<45 else "HOLD"
         w.writerow([datetime.now(timezone.utc).isoformat(), name, round(acc,4), round(prob,1), sig])
 
-print("predictor_compare done")
+print("predictor_compare done - FOREX ONLY, NO BTC")
