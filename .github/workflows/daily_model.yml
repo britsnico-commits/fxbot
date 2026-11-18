@@ -1,0 +1,43 @@
+name: FXBOT Daily Model (Once a Day)
+
+on:
+  schedule:
+    - cron: '5 22 * * *'  # 22:05 UTC = 00:05 SA - AFTER daily close
+  workflow_dispatch:
+
+jobs:
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          pip install yfinance pandas numpy scikit-learn xgboost lightgbm reportlab
+      - name: Pull latest
+        run: |
+          git pull --rebase origin main || git pull origin main
+      - name: Run predictor (forex-only, completed bars only)
+        run: |
+          python predictor_v3.py
+      - name: Build today's signal (uses completed bars)
+        run: |
+          python today_signal.py
+      - name: Paper trade (1 per day, kill-switch, weekend/NFP, sizing)
+        run: |
+          python paper_trade_v2.py
+      - name: Update live accuracy
+        run: |
+          python live_accuracy.py
+      - name: Commit daily results
+        run: |
+          git config user.name "fxbot"
+          git config user.email "fxbot@canic.trade"
+          git add results/predictions.csv results/today_signal.csv results/signal_history.csv results/paper_trades.csv results/live_accuracy.csv results/shock_days.csv || true
+          git diff --staged --quiet || git commit -m "Daily model $(date -u +%Y-%m-%d) - prob from completed bars"
+          git push origin main
