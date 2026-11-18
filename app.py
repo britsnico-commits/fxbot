@@ -1,10 +1,14 @@
-# app.py - CANIC FXBOT - Full Version with Zoomed Charts
+# app.py - CANIC FXBOT - Auto-refresh + Settle Countdown + Coloured Table
 import os
 import pandas as pd
 import streamlit as st
 import altair as alt
+from datetime import datetime, timezone
 
 st.set_page_config(page_title="CANIC FXBOT - Paper Trading", layout="wide", page_icon="📈")
+
+# --- AUTO-REFRESH EVERY 60 SEC ---
+st.markdown('<meta http-equiv="refresh" content="60">', unsafe_allow_html=True)
 
 st.markdown("""
 <style>
@@ -23,6 +27,7 @@ st.markdown("""
     .card-green { background: linear-gradient(135deg, #065f46, #059669); }
     .card-red { background: linear-gradient(135deg, #7f1d1d, #dc2626); }
     .card-blue { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+    .card-purple { background: linear-gradient(135deg, #5b21b6, #8b5cf6); }
     .label { font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 1px; }
     .big-num { font-size: 40px; font-weight: 800; line-height: 1.1; margin: 4px 0; }
     .sub { font-size: 14px; opacity: 0.9; }
@@ -38,11 +43,15 @@ st.markdown("""
     .section-title { color: #0f172a !important; font-size: 22px; font-weight: 700; margin: 18px 0 8px 0; }
     .caption-dark { color: #475569 !important; font-size: 13px; }
     .live-price { color: #0f172a !important; font-size: 20px; font-weight: 700; margin: 6px 0; }
+    .countdown { color: #0f172a !important; font-size: 17px; font-weight: 600; margin: 6px 0; }
+    .trade-win { background: #dcfce7 !important; color: #166534 !important; }
+    .trade-loss { background: #fee2e2 !important; color: #991b1b !important; }
+    .trade-open { background: #fef9c3 !important; color: #854d0e !important; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h1>📈 CANIC FXBOT <span style='font-size:18px; color:#64748b;'>— Paper Trading on LIVE Data</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748b;'>Forex-only • EUR/USD • 1 trade / day • 45/55 Rule • ADX Filter</p>", unsafe_allow_html=True)
+st.markdown("<p style='color:#64748b;'>Forex-only • EUR/USD • 1 trade / day • 45/55 Rule • ADX Filter • Auto-refreshes every 60s 🔄</p>", unsafe_allow_html=True)
 
 def load_csv(path):
     try:
@@ -70,6 +79,14 @@ def get_balance(trades):
     win_rate = (wins / closed * 100) if closed > 0 else 0.0
     return bal, profit, win_rate, f"{wins}/{closed}" if closed > 0 else f"0/{len(trades)}"
 
+def parse_ts(s):
+    try:
+        # Handles "2026-11-18T10:14:46.173408+00:00" and "2026-11-18 14:33"
+        ts = pd.to_datetime(str(s), utc=True)
+        return ts
+    except Exception:
+        return None
+
 signal_df = load_csv("results/today_signal.csv")
 pred_df = load_csv("results/predictions.csv")
 trades = load_csv("results/paper_trades.csv")
@@ -87,7 +104,6 @@ if live_count == 0 and len(acc) > 0 and "live_points" in acc.columns:
         live_count = int(acc.iloc[-1]["live_points"])
     except Exception:
         pass
-# If accuracy log has higher count than live file (git reset case), use accuracy log
 if len(acc) > 0 and "live_points" in acc.columns:
     try:
         acc_max = int(acc["live_points"].max())
@@ -175,6 +191,53 @@ with c3:
 with c4:
     st.markdown(f"""<div class="big-card card-blue"><div class="label">📊 Trades Closed</div><div class="big-num">{trades_closed}</div><div class="sub">{len(trades)} total • 1/day max</div></div>""", unsafe_allow_html=True)
 
+# --- NEW: OPEN TRADE COUNTDOWN ---
+# Finds OPEN trade, adds 20h, shows time left + what price it needs to win
+open_trade = None
+if len(trades) > 0 and "status" in trades.columns:
+    opens = trades[trades["status"].astype(str).str.upper() == "OPEN"]
+    if len(opens) > 0:
+        open_trade = opens.iloc[-1]
+
+if open_trade is not None:
+    try:
+        o_sig = str(open_trade.get("signal", "BUY"))
+        o_price = float(open_trade.get("price", 0) or 0)
+        o_prob = float(open_trade.get("prob", 0) or 0)
+        o_stake = float(open_trade.get("stake", 10) or 10)
+        o_ts = parse_ts(open_trade.get("timestamp", ""))
+        now_utc = pd.Timestamp.now(tz="UTC")
+        if o_ts is not None:
+            settle = o_ts + pd.Timedelta(hours=20)
+            remaining = settle - now_utc
+            total_sec = int(remaining.total_seconds())
+            if total_sec < 0:
+                countdown_txt = "⏰ Settling now — check next Daily Run"
+                need_txt = "Settling"
+            else:
+                h = total_sec // 3600
+                m = (total_sec % 3600) // 60
+                countdown_txt = f"⏳ Settles in {h}h {m}m — at {settle.strftime('%H:%M')} UTC"
+                if o_sig == "BUY":
+                    need_txt = f"Needs EUR/USD &gt; {o_price:.4f} to WIN (+${o_stake*0.85:.2f}) • Below = LOSS (-${o_stake:.0f})"
+                else:
+                    need_txt = f"Needs EUR/USD &lt; {o_price:.4f} to WIN (+${o_stake*0.85:.2f}) • Above = LOSS (-${o_stake:.0f})"
+            st.markdown(f"<div class='section-title'>⏱️ Open Trade — Countdown</div>", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="big-card card-purple">
+                <div class="label">Open Trade</div>
+                <div class="big-num">{o_sig} {o_prob:.1f}% @ {o_price:.4f} • ${o_stake:.0f} stake</div>
+                <div class="sub">{countdown_txt}</div>
+                <div class="sub" style="margin-top:6px;">{need_txt}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p class='countdown'>Open Trade: {o_sig} @ {o_price:.4f} — settle time unknown</p>", unsafe_allow_html=True)
+    except Exception as e:
+        st.markdown(f"<p class='caption-dark'>Open trade found, countdown failed: {e}</p>", unsafe_allow_html=True)
+else:
+    st.markdown("<p class='caption-dark'>No open trade — next trade opens when Prob &gt;55% or &lt;45% and ADX ≥20.</p>", unsafe_allow_html=True)
+
 # --- LIVE EUR/USD CHART - ZOOMED ---
 st.markdown("<div class='section-title'>💹 Live EUR/USD — What Is It Doing Right Now?</div>", unsafe_allow_html=True)
 live_chart_ok = False
@@ -194,7 +257,6 @@ try:
         chg_emoji = "🟢" if chg >= 0 else "🔴"
         chg_word = "UP" if chg >= 0 else "DOWN"
         st.markdown(f"<p class='live-price'>EUR/USD Now: {last:.4f} &nbsp; {chg_emoji} {chg:+.4f} ({chg_pct:+.2f}% today) — {chg_word}</p>", unsafe_allow_html=True)
-        # ZOOMED CHART - not 0 to 1.0
         chart_df = pd.DataFrame({"EUR/USD": close.values})
         ymin = float(chart_df["EUR/USD"].min()) - 0.0005
         ymax = float(chart_df["EUR/USD"].max()) + 0.0005
@@ -203,7 +265,7 @@ try:
             y=alt.Y("EUR/USD", scale=alt.Scale(domain=[ymin, ymax]))
         ).properties(height=280)
         st.altair_chart(chart, use_container_width=True)
-        st.markdown("<p class='caption-dark'>Last 24h, 15-min prices. Zoomed to show real moves. Refresh page for fresh price — no Daily Run needed.</p>", unsafe_allow_html=True)
+        st.markdown("<p class='caption-dark'>Last 24h, 15-min prices. Zoomed to show real moves. Auto-refreshes every 60s.</p>", unsafe_allow_html=True)
         live_chart_ok = True
 except Exception:
     live_chart_ok = False
@@ -242,7 +304,6 @@ if len(trades) > 0 and "pnl" in trades.columns:
         except Exception: pass
     if len(equity)==1: equity=[100.0,100.0]
     eq_df = pd.DataFrame({"Balance": equity})
-    # Zoom 90-120 so $8 win is visible, not flat on 0-100
     eq_chart = alt.Chart(eq_df.reset_index()).mark_line(color="#059669", strokeWidth=3).encode(
         x=alt.X("index", title="Closed trades"),
         y=alt.Y("Balance", scale=alt.Scale(domain=[90, 120]))
@@ -257,12 +318,33 @@ else:
     st.altair_chart(eq_chart, use_container_width=True)
 st.markdown("<p class='caption-dark'>Start $100 fake. Zoomed 90-120 so small wins/losses are visible. If line goes up over 1 month, daily model works.</p>", unsafe_allow_html=True)
 
-# --- TRADES ---
+# --- TRADES - COLOURED TABLE ---
 st.markdown("<div class='section-title'>📋 Paper Trade History</div>", unsafe_allow_html=True)
 if len(trades) > 0:
     show = trades.copy()
     cols = [c for c in ["timestamp","signal","prob","price","stake","type","pnl","status"] if c in show.columns]
-    st.dataframe(show[cols] if cols else show, use_container_width=True)
+    show = show[cols] if cols else show
+    # Colour by status / pnl
+    def color_row(row):
+        try:
+            status = str(row.get("status","")).upper()
+            pnl = float(row.get("pnl", 0) or 0)
+            if status == "OPEN":
+                return ["background-color: #fef9c3; color: #854d0e; font-weight: 600"] * len(row)
+            elif pnl > 0 or status == "WIN":
+                return ["background-color: #dcfce7; color: #166534; font-weight: 600"] * len(row)
+            elif pnl < 0 or status == "LOSS":
+                return ["background-color: #fee2e2; color: #991b1b; font-weight: 600"] * len(row)
+            else:
+                return [""] * len(row)
+        except Exception:
+            return [""] * len(row)
+    try:
+        styled = show.style.apply(color_row, axis=1)
+        st.dataframe(styled, use_container_width=True)
+    except Exception:
+        st.dataframe(show, use_container_width=True)
+    st.markdown("<p class='caption-dark'>🟡 Yellow = OPEN &nbsp;|&nbsp; 🟢 Green = WIN &nbsp;|&nbsp; 🔴 Red = LOSS</p>", unsafe_allow_html=True)
 else:
     st.markdown("<div class='big-card card-dark'>No trades yet. Bot opens 1 trade/day when Prob &gt;55% or &lt;45% and ADX ≥20.</div>", unsafe_allow_html=True)
 
@@ -287,4 +369,4 @@ else:
     st.write("No accuracy log yet.")
 
 st.divider()
-st.markdown("<p class='caption-dark'>CANIC FXBOT | Forex-only | EUR/USD | 1 trade/day max | $10-$20 stake | Kill-switch if balance &lt; $70 | No trade weekends / NFP Friday | ADX &lt;20 = HOLD</p>", unsafe_allow_html=True)
+st.markdown("<p class='caption-dark'>CANIC FXBOT | Forex-only | EUR/USD | 1 trade/day max | $10-$20 stake | Kill-switch if balance &lt; $70 | No trade weekends / NFP Friday | ADX &lt;20 = HOLD • Auto-refresh 60s</p>", unsafe_allow_html=True)
