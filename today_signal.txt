@@ -1,19 +1,5 @@
-FXBOT SIGNAL - 2026-11-18 12:55 UTC
-================================================
-Date: 2026-11-18
-Model: Ensemble (average)
-Prob UP tomorrow: 55.2%
-Signal: BUY
-Confidence: MEDIUM
-Action: Go LONG EUR/USD tomorrow
-Shock recent (last 5d): No
-
-Details:
-- 55.7% RF accuracy historically (2022-2026)
-- 55.9% recent accuracy (2025+)
-- Top driver: btc_ret_1
-- Buy & Hold benchmark: -1% over same period
-
-Paper trade: Logistic +9.8% vs BH 6.2% in 2025+ (PASS)
-
-This is paper-trade only, not financial advice.
+Date: 2026-11-18 13:51 UTC
+Prob UP Tomorrow: 50.0%
+Signal: HOLD
+Rule: 45/55 Threshold
+ADX: 10.2 - CHOPPY, HOLD forced (was HOLD)
