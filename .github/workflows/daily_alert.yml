@@ -1,0 +1,58 @@
+name: FXBOT Daily Email Alert
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC = 08:00 SA
+  workflow_dispatch:
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install pandas || true
+      - run: python -c "
+import pandas as pd
+from pathlib import Path
+import re
+
+txt = Path('today_signal.txt').read_text() if Path('today_signal.txt').exists() else ''
+m = re.search(r'Prob UP[^0-9]*([0-9.]+)%', txt, re.I)
+prob = float(m.group(1)) if m else 50.0
+trade = 'SELL' if prob < 45 else 'BUY' if prob > 55 else 'HOLD'
+
+bal = 100
+trades = 0
+win = 0
+if Path('results/paper_trades.csv').exists():
+    try:
+        df = pd.read_csv('results/paper_trades.csv')
+        trades = len(df)
+        closed = df[df['status'].astype(str).str.contains('CLOSED')]
+        if len(closed)>0:
+            bal = 100 + float(closed['pnl'].sum())
+            win = float((closed['pnl']>0).mean()*100)
+    except: pass
+
+live = 0
+if Path('results/live_log.csv').exists():
+    try: live = len(pd.read_csv('results/live_log.csv'))
+    except: pass
+
+body = f'Today Signal: {trade} {prob}%\\nFake Balance: \${bal:.2f} | Win {win:.1f}% | Trades {trades}\\nLive Points: {live}/2880\\n\\nDashboard: https://canictrade.streamlit.app\\n\\nSignal detail:\\n{txt[:500]}'
+Path('email_body.txt').write_text(body)
+print(body)
+"
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'CANIC FXBOT Daily - ${{ github.run_number }}'
+          to: ${{ secrets.EMAIL_TO }}
+          from: CANIC FXBOT
+          body: file://email_body.txt
