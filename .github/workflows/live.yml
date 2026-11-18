@@ -29,6 +29,6 @@ jobs:
         run: |
           git config user.name "fxbot"
           git config user.email "fxbot@canic.trade"
-          git add results/live_prices.csv results/live_accuracy.csv results/signal_history.csv || true
+          git add -A results/ || true
           git diff --staged --quiet || git commit -m "Live price ${{ github.run_number }} - $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push origin main
