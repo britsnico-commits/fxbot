@@ -1,1 +1,22 @@
-reportlab
+name: FXBOT Monthly Report
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt reportlab matplotlib || echo "pip failed"
+      - run: python monthly_report.py || echo "report failed"
+      - run: |
+          git config --global user.email 'bot@fxbot.com'
+          git config --global user.name 'FXBOT Monthly Bot'
+          git add -A || true
+          git commit -m 'Monthly PDF report' || echo "No changes"
+          git pull --rebase --autostash || true
+          git push || echo "Push skipped"
