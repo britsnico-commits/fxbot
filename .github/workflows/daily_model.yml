@@ -38,6 +38,6 @@ jobs:
         run: |
           git config user.name "fxbot"
           git config user.email "fxbot@canic.trade"
-          git add results/predictions.csv results/today_signal.csv results/signal_history.csv results/paper_trades.csv results/live_accuracy.csv results/shock_days.csv || true
+          git add -A results/ || true
           git diff --staged --quiet || git commit -m "Daily model $(date -u +%Y-%m-%d) - prob from completed bars"
           git push origin main
