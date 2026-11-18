@@ -1,19 +1,16 @@
-# app.py - CANIC FXBOT - Fixed Contrast Version
-# Light background, dark text OUTSIDE cards, white text INSIDE dark cards only
+# app.py - CANIC FXBOT - Full Version with Live EUR/USD Chart
+# Light bg, dark text outside cards, white text inside cards only
 import os
 import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="CANIC FXBOT - Paper Trading", layout="wide", page_icon="📈")
 
-# --- FIXED CSS: DO NOT force all text white ---
 st.markdown("""
 <style>
     .block-container { padding-top: 1.2rem; padding-bottom: 1rem; }
-    /* Outside cards: keep Streamlit default dark text on light bg */
     h1, h2, h3 { color: #0f172a !important; }
     p, span, div, label { color: #0f172a; }
-    /* Inside dark cards: force white */
     .big-card, .big-card * { color: #ffffff !important; }
     .big-card {
         border-radius: 16px; padding: 18px 20px; margin-bottom: 12px;
@@ -36,12 +33,11 @@ st.markdown("""
     .badge-green { background: #10b981; }
     .badge-orange { background: #f59e0b; }
     .badge-red { background: #ef4444; }
-    /* Tables: keep dark text, light bg - readable */
     [data-testid="stDataFrame"] { background: #ffffff; border-radius: 12px; }
     [data-testid="stDataFrame"] * { color: #0f172a !important; }
-    /* Section headings: dark, readable */
     .section-title { color: #0f172a !important; font-size: 22px; font-weight: 700; margin: 18px 0 8px 0; }
     .caption-dark { color: #475569 !important; font-size: 13px; }
+    .live-price { color: #0f172a !important; font-size: 20px; font-weight: 700; margin: 6px 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,7 +74,6 @@ signal_df = load_csv("results/today_signal.csv")
 pred_df = load_csv("results/predictions.csv")
 trades = load_csv("results/paper_trades.csv")
 live = load_csv("results/live_prices.csv")
-# Fallback: try other live file names
 if len(live) == 0:
     for alt in ["results/live_price_points.csv", "results/live_price.csv", "results/prices.csv"]:
         live = load_csv(alt)
@@ -86,7 +81,6 @@ if len(live) == 0:
             break
 acc = load_csv("results/live_accuracy.csv")
 
-# --- FIX: Live points count - use accuracy log if live file empty ---
 live_count = len(live)
 if live_count == 0 and len(acc) > 0 and "live_points" in acc.columns:
     try:
@@ -173,6 +167,48 @@ with c3:
 with c4:
     st.markdown(f"""<div class="big-card card-blue"><div class="label">📊 Trades Closed</div><div class="big-num">{trades_closed}</div><div class="sub">{len(trades)} total • 1/day max</div></div>""", unsafe_allow_html=True)
 
+# --- LIVE EUR/USD CHART - OPTION 2 LIVELIER ---
+st.markdown("<div class='section-title'>💹 Live EUR/USD — What Is It Doing Right Now?</div>", unsafe_allow_html=True)
+live_chart_ok = False
+try:
+    import yfinance as yf
+    df_live = yf.download("EURUSD=X", period="1d", interval="15m", auto_adjust=True, progress=False)
+    if df_live is not None and len(df_live) > 0:
+        if isinstance(df_live.columns, pd.MultiIndex):
+            df_live.columns = df_live.columns.get_level_values(0)
+        close = df_live["Close"]
+        if isinstance(close, pd.DataFrame):
+            close = close.iloc[:, 0]
+        last = float(close.iloc[-1])
+        first = float(close.iloc[0])
+        chg = last - first
+        chg_pct = chg / first * 100 if first != 0 else 0
+        chg_emoji = "🟢" if chg >= 0 else "🔴"
+        chg_word = "UP" if chg >= 0 else "DOWN"
+        st.markdown(f"<p class='live-price'>EUR/USD Now: {last:.4f} &nbsp; {chg_emoji} {chg:+.4f} ({chg_pct:+.2f}% today) — {chg_word}</p>", unsafe_allow_html=True)
+        st.line_chart(pd.DataFrame({"EUR/USD": close.values}), height=280)
+        st.markdown("<p class='caption-dark'>Last 24h, 15-min prices. Refresh page for fresh price — no Daily Run needed.</p>", unsafe_allow_html=True)
+        live_chart_ok = True
+except Exception:
+    live_chart_ok = False
+
+if not live_chart_ok:
+    # Fallback: your own collected points
+    if len(live) > 0 and "price" in live.columns:
+        try:
+            last_p = float(live.iloc[-1]["price"])
+            first_p = float(live.iloc[0]["price"])
+            chg_p = last_p - first_p
+            chg_pct_p = chg_p / first_p * 100 if first_p != 0 else 0
+            chg_e = "🟢" if chg_p >= 0 else "🔴"
+            st.markdown(f"<p class='live-price'>EUR/USD (from your bot): {last_p:.4f} &nbsp; {chg_e} {chg_p:+.4f} ({chg_pct_p:+.2f}% since start)</p>", unsafe_allow_html=True)
+        except Exception:
+            pass
+        st.line_chart(pd.DataFrame({"EUR/USD": live["price"].values}), height=280)
+        st.markdown(f"<p class='caption-dark'>From your bot — {len(live)} points collected. Yahoo live feed was unreachable, showing bot data.</p>", unsafe_allow_html=True)
+    else:
+        st.write("No live chart data yet — run Daily Run once.")
+
 # --- EQUITY ---
 st.markdown("<div class='section-title'>📈 Equity Curve — Are We Winning?</div>", unsafe_allow_html=True)
 if len(trades) > 0 and "pnl" in trades.columns:
@@ -197,7 +233,7 @@ if len(trades) > 0:
 else:
     st.markdown("<div class='big-card card-dark'>No trades yet. Bot opens 1 trade/day when Prob &gt;55% or &lt;45% and ADX ≥20.</div>", unsafe_allow_html=True)
 
-# --- LIVE POINTS - FIXED COUNT ---
+# --- LIVE POINTS ---
 pct = live_count/2880*100 if live_count>0 else 0
 st.markdown(f"<div class='section-title'>🔴 Live Price Points: {live_count} / 2880 ({pct:.1f}% of 1 month)</div>", unsafe_allow_html=True)
 st.progress(min(live_count/2880, 1.0))
