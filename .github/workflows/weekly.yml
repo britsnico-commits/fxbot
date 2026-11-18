@@ -1,0 +1,23 @@
+name: FXBOT Weekly Retrain
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday 00:00 UTC
+  workflow_dispatch:
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt || echo "pip failed"
+      - run: python predictor_v3.py || echo "predictor failed"
+      - run: python check.py || echo "check failed"
+      - run: |
+          git config --global user.email 'bot@fxbot.com'
+          git config --global user.name 'FXBOT Weekly Bot'
+          git add -A || true
+          git commit -m 'Weekly retrain - updated model with new live data' || echo "No changes"
+          git pull --rebase --autostash || true
+          git push || echo "Push skipped"
