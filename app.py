@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - FIXED SYNTAX ERROR - Zoomed Charts
+# app.py - CANIC FXBOT - FINAL - All charts zoomed to show movement
 import os
 import pandas as pd
 import streamlit as st
@@ -240,8 +240,7 @@ with e1:
             min_e = min(eq) - 1
             max_e = max(eq) + 1
             if min_e == max_e:
-                min_e -= 2
-                max_e += 2
+                min_e -= 2; max_e += 2
             eq_chart = alt.Chart(eq_df).mark_line(color="#10b981", strokeWidth=3).encode(
                 x=alt.X('idx:Q', title='Trades'),
                 y=alt.Y('Equity:Q', scale=alt.Scale(domain=[min_e, max_e]), title='Balance $')
@@ -306,7 +305,7 @@ with e2:
             ).properties(height=300).interactive()
             st.altair_chart(chart, use_container_width=True)
             move_pips = (max_p - min_p) * 10000
-            st.caption(f"Zoomed: {y_min:.5f} - {y_max:.5f} | Move: {move_pips:.1f} pips | {len(df_plot)} points")
+            st.caption(f"🔍 Zoomed: {y_min:.5f} - {y_max:.5f} | Move: {move_pips:.1f} pips | {len(df_plot)} points")
             if len(live_prices)>0:
                 st.dataframe(live_prices.tail(3), use_container_width=True)
         except Exception as e:
@@ -319,12 +318,31 @@ with e2:
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### 🔮 Signal History + ADX Trend")
+    st.markdown("#### 🔮 Signal History + ADX Trend — ZOOMED 45-55")
     if len(sig_hist)>0:
         try:
-            st.line_chart(sig_hist[["prob_up"]].tail(30) if "prob_up" in sig_hist.columns else sig_hist.tail(30))
-        except Exception:
+            import altair as alt
+            hist_df = sig_hist.tail(30).copy()
+            if "prob_up" in hist_df.columns:
+                hist_df = hist_df.reset_index()
+                min_h = float(hist_df["prob_up"].min()) - 0.5
+                max_h = float(hist_df["prob_up"].max()) + 0.5
+                min_h = min(min_h, 45)
+                max_h = max(max_h, 55)
+                if min_h == max_h:
+                    min_h -= 1; max_h += 1
+                chart_h = alt.Chart(hist_df).mark_line(color="#8b5cf6", strokeWidth=3, point=alt.OverlayMarkDef(color="#8b5cf6", size=40)).encode(
+                    x=alt.X('index:Q', title='Signals'),
+                    y=alt.Y('prob_up:Q', title='Prob %', scale=alt.Scale(domain=[min_h, max_h])),
+                    tooltip=['prob_up']
+                ).properties(height=200).interactive()
+                st.altair_chart(chart_h, use_container_width=True)
+                st.caption(f"Zoomed {min_h:.1f}% - {max_h:.1f}% | Last {len(hist_df)} signals | 45/55 rule")
+            else:
+                st.line_chart(hist_df.tail(30))
+        except Exception as e:
             st.dataframe(sig_hist.tail(10), use_container_width=True)
+            st.caption(f"Fallback: {e}")
     else:
         if len(today_sig)>0:
             st.line_chart(pd.DataFrame({"prob": [prob]}))
@@ -349,11 +367,10 @@ with e2:
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("#### 📋 Paper Trade History")
-
 if len(trades)>0:
     st.dataframe(trades.tail(20), use_container_width=True)
 else:
     st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 50.7% so no trade, correct.")
-
 st.markdown('</div>', unsafe_allow_html=True)
-st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | Zoomed charts")
+
+st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | All charts zoomed")
