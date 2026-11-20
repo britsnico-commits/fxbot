@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - FIXED ZOOMED CHARTS - See pips movement
+# app.py - CANIC FXBOT - FIXED SYNTAX ERROR - Zoomed Charts
 import os
 import pandas as pd
 import streamlit as st
@@ -59,16 +59,14 @@ def load_csv(path):
     return pd.DataFrame()
 
 def get_live_chart(live_prices_df):
-    # Try Yahoo first
     try:
         df = yf.download("EURUSD=X", period="1d", interval="15m", auto_adjust=True, progress=False)
         if df is not None and len(df) > 10:
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             return df
-    except Exception as e:
-        print(f"Yahoo chart fail: {e}")
-    # Fallback: use live_prices.csv - last 96 = 24h
+    except Exception:
+        pass
     try:
         if len(live_prices_df) > 0 and "price" in live_prices_df.columns:
             tail = live_prices_df.tail(96).copy()
@@ -76,8 +74,8 @@ def get_live_chart(live_prices_df):
             tail = tail.set_index("timestamp")
             tail = tail.rename(columns={"price": "Close"})
             return tail
-    except Exception as e:
-        print(f"Fallback chart fail: {e}")
+    except Exception:
+        pass
     return pd.DataFrame()
 
 today_sig = load_csv("results/today_signal.csv")
@@ -242,11 +240,11 @@ with e1:
             min_e = min(eq) - 1
             max_e = max(eq) + 1
             if min_e == max_e:
-                min_e -= 2; max_e += 2
+                min_e -= 2
+                max_e += 2
             eq_chart = alt.Chart(eq_df).mark_line(color="#10b981", strokeWidth=3).encode(
                 x=alt.X('idx:Q', title='Trades'),
-                y=alt.Y('Equity:Q', scale=alt.Scale(domain=[min_e, max_e]), title='Balance $'),
-                tooltip=['idx', 'Equity']
+                y=alt.Y('Equity:Q', scale=alt.Scale(domain=[min_e, max_e]), title='Balance $')
             ).properties(height=220).interactive()
             st.altair_chart(eq_chart, use_container_width=True)
         except Exception:
@@ -262,9 +260,11 @@ with e1:
         probs = []
         for _, r in trades.iterrows():
             try:
-                if str(r.get("type","")).upper()=="RESET": continue
+                if str(r.get("type","")).upper()=="RESET":
+                    continue
                 p = float(r.get("prob",0))
-                if 0<p<=1: p*=100
+                if 0 < p <= 1:
+                    p *= 100
                 probs.append(p)
             except Exception:
                 pass
@@ -279,7 +279,7 @@ with e1:
 
 with e2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### 💱 Live EUR/USD — Last 24h (15m) — ZOOMED to show pips")
+    st.markdown("#### 💱 Live EUR/USD — Last 24h — ZOOMED to show pips")
     chart_df = get_live_chart(live_prices)
     if len(chart_df)>0 and "Close" in chart_df.columns:
         try:
@@ -306,14 +306,14 @@ with e2:
             ).properties(height=300).interactive()
             st.altair_chart(chart, use_container_width=True)
             move_pips = (max_p - min_p) * 10000
-            st.caption(f"🔍 Zoomed: {y_min:.5f} - {y_max:.5f} | Move today: {move_pips:.1f} pips | {len(df_plot)} points | Source: {'Yahoo' if len(chart_df)>20 else 'live_prices.csv fallback'}")
+            st.caption(f"Zoomed: {y_min:.5f} - {y_max:.5f} | Move: {move_pips:.1f} pips | {len(df_plot)} points")
             if len(live_prices)>0:
                 st.dataframe(live_prices.tail(3), use_container_width=True)
         except Exception as e:
             st.line_chart(chart_df["Close"])
-            st.caption(f"Fallback chart - altair error: {e}")
+            st.caption(f"Fallback chart: {e}")
     else:
-        st.warning("Chart empty — waiting for 2 live points (30m). Yahoo blocked + live_prices.csv has only 1 point so far.")
+        st.warning("Chart empty — waiting for 2 live points (30m)")
         if len(live_prices)>0:
             st.dataframe(live_prices.tail(5), use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -322,18 +322,7 @@ with e2:
     st.markdown("#### 🔮 Signal History + ADX Trend")
     if len(sig_hist)>0:
         try:
-            import altair as alt
-            hist_df = sig_hist.tail(30).copy()
-            if "prob_up" in hist_df.columns:
-                min_h = float(hist_df["prob_up"].min()) - 1
-                max_h = float(hist_df["prob_up"].max()) + 1
-                chart_h = alt.Chart(hist_df.reset_index()).mark_line(color="#8b5cf6", strokeWidth=2).encode(
-                    x='index:Q',
-                    y=alt.Y('prob_up:Q', scale=alt.Scale(domain=[min_h, max_h]))
-                ).properties(height=150)
-                st.altair_chart(chart_h, use_container_width=True)
-            else:
-                st.line_chart(hist_df.tail(30))
+            st.line_chart(sig_hist[["prob_up"]].tail(30) if "prob_up" in sig_hist.columns else sig_hist.tail(30))
         except Exception:
             st.dataframe(sig_hist.tail(10), use_container_width=True)
     else:
@@ -360,37 +349,11 @@ with e2:
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("#### 📋 Paper Trade History")
+
 if len(trades)>0:
-    def countdown(ts_str):
-        try:
-            ts = pd.to_datetime(ts_str, utc=True)
-            now = datetime.now(timezone.utc)
-            settle = ts + timedelta(hours=20)
-            diff = settle - now
-            if diff.total_seconds() <=0:
-                return "Settling..."
-            h = int(diff.total_seconds()//3600)
-            m = int((diff.total_seconds()%3600)//60)
-            return f"{h}h {m}m ⏳"
-        except Exception:
-            return "-"
-    trades_display = trades.copy()
-    if "timestamp" in trades_display.columns:
-        trades_display["countdown"] = trades_display.apply(lambda r: countdown(r["timestamp"]) if str(r.get("status","")).upper()=="OPEN" else "-", axis=1)
-    def color_status(val):
-        s = str(val).upper()
-        if s=="WIN": return "background-color: #dcfce7; color:#166534; font-weight:700"
-        if s=="LOSS": return "background-color: #fee2e2; color:#991b1b; font-weight:700"
-        if s=="OPEN": return "background-color: #fef9c3; color:#92400e; font-weight:700"
-        if s=="RESET": return "background-color: #dbeafe; color:#1e40af; font-weight:700"
-        return ""
-    try:98
-        styled = trades_display.tail(20).style.applymap(color_status, subset=["status"])
-        st.dataframe(styled, use_container_width=True)
-    except Exception:
-        st.dataframe(trades_display.tail(20), use_container_width=True)
+    st.dataframe(trades.tail(20), use_container_width=True)
 else:
     st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 50.7% so no trade, correct.")
-st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | Zoomed charts to show pips")
+st.markdown('</div>', unsafe_allow_html=True)
+st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | Zoomed charts")
