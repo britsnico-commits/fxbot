@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - FIXED CHART PLOTTING - Uses live_prices.csv fallback
+# app.py - CANIC FXBOT - FIXED ZOOMED CHARTS - See pips movement
 import os
 import pandas as pd
 import streamlit as st
@@ -59,7 +59,7 @@ def load_csv(path):
     return pd.DataFrame()
 
 def get_live_chart(live_prices_df):
-    # Try Yahoo
+    # Try Yahoo first
     try:
         df = yf.download("EURUSD=X", period="1d", interval="15m", auto_adjust=True, progress=False)
         if df is not None and len(df) > 10:
@@ -68,7 +68,7 @@ def get_live_chart(live_prices_df):
             return df
     except Exception as e:
         print(f"Yahoo chart fail: {e}")
-    # Fallback: use your own live_prices.csv
+    # Fallback: use live_prices.csv - last 96 = 24h
     try:
         if len(live_prices_df) > 0 and "price" in live_prices_df.columns:
             tail = live_prices_df.tail(96).copy()
@@ -227,7 +227,7 @@ e1, e2 = st.columns([1.3, 1])
 
 with e1:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### 📈 Equity Curve")
+    st.markdown("#### 📈 Equity Curve — Zoomed")
     if len(trades)>0 and "pnl" in trades.columns:
         eq = [100.0]
         for _, r in trades.iterrows():
@@ -236,11 +236,26 @@ with e1:
                     eq.append(eq[-1]+float(r.get("pnl",0) or 0))
             except Exception:
                 pass
-        st.line_chart(pd.DataFrame({"Equity": eq}))
+        try:
+            import altair as alt
+            eq_df = pd.DataFrame({"idx": range(len(eq)), "Equity": eq})
+            min_e = min(eq) - 1
+            max_e = max(eq) + 1
+            if min_e == max_e:
+                min_e -= 2; max_e += 2
+            eq_chart = alt.Chart(eq_df).mark_line(color="#10b981", strokeWidth=3).encode(
+                x=alt.X('idx:Q', title='Trades'),
+                y=alt.Y('Equity:Q', scale=alt.Scale(domain=[min_e, max_e]), title='Balance $'),
+                tooltip=['idx', 'Equity']
+            ).properties(height=220).interactive()
+            st.altair_chart(eq_chart, use_container_width=True)
+        except Exception:
+            st.line_chart(pd.DataFrame({"Equity": eq}))
     else:
         st.line_chart(pd.DataFrame({"Equity": [100.0]}))
         st.caption("No trades yet — curve will move after first win/loss")
     st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🎯 Confidence Distribution")
     if len(trades)>0 and "prob" in trades.columns:
@@ -264,27 +279,61 @@ with e1:
 
 with e2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("#### 💱 Live EUR/USD — Last 24h (15m)")
+    st.markdown("#### 💱 Live EUR/USD — Last 24h (15m) — ZOOMED to show pips")
     chart_df = get_live_chart(live_prices)
     if len(chart_df)>0 and "Close" in chart_df.columns:
-        # Fix Y-axis: filter to EUR/USD realistic range 1.0-1.2
         try:
+            import altair as alt
+            df_plot = chart_df.reset_index()
+            if "timestamp" not in df_plot.columns:
+                first_col = df_plot.columns[0]
+                df_plot = df_plot.rename(columns={first_col: "timestamp"})
+            df_plot = df_plot.tail(96)
+            min_p = float(df_plot["Close"].min())
+            max_p = float(df_plot["Close"].max())
+            if min_p == max_p:
+                y_min = min_p - 0.001
+                y_max = max_p + 0.001
+            else:
+                pad = (max_p - min_p) * 0.6
+                pad = max(pad, 0.0003)
+                y_min = min_p - pad
+                y_max = max_p + pad
+            chart = alt.Chart(df_plot).mark_line(color="#0ea5e9", strokeWidth=3, point=alt.OverlayMarkDef(color="#0ea5e9", size=30)).encode(
+                x=alt.X('timestamp:T', title='Time'),
+                y=alt.Y('Close:Q', title='EUR/USD', scale=alt.Scale(domain=[y_min, y_max])),
+                tooltip=['timestamp:T', 'Close:Q']
+            ).properties(height=300).interactive()
+            st.altair_chart(chart, use_container_width=True)
+            move_pips = (max_p - min_p) * 10000
+            st.caption(f"🔍 Zoomed: {y_min:.5f} - {y_max:.5f} | Move today: {move_pips:.1f} pips | {len(df_plot)} points | Source: {'Yahoo' if len(chart_df)>20 else 'live_prices.csv fallback'}")
+            if len(live_prices)>0:
+                st.dataframe(live_prices.tail(3), use_container_width=True)
+        except Exception as e:
             st.line_chart(chart_df["Close"])
-        except Exception:
-            st.line_chart(chart_df)
-        if len(live_prices)>0:
-            st.dataframe(live_prices.tail(3), use_container_width=True)
-        st.caption(f"Source: {'Yahoo 15m' if len(chart_df)>20 else 'Your live_prices.csv fallback'} — {len(chart_df)} points")
+            st.caption(f"Fallback chart - altair error: {e}")
     else:
-        st.warning("Chart empty — Yahoo blocked + no live_prices.csv yet. Will plot after 2 live points (30m)")
+        st.warning("Chart empty — waiting for 2 live points (30m). Yahoo blocked + live_prices.csv has only 1 point so far.")
         if len(live_prices)>0:
             st.dataframe(live_prices.tail(5), use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🔮 Signal History + ADX Trend")
     if len(sig_hist)>0:
         try:
-            st.line_chart(sig_hist[["prob_up"]].tail(30) if "prob_up" in sig_hist.columns else sig_hist.tail(30))
+            import altair as alt
+            hist_df = sig_hist.tail(30).copy()
+            if "prob_up" in hist_df.columns:
+                min_h = float(hist_df["prob_up"].min()) - 1
+                max_h = float(hist_df["prob_up"].max()) + 1
+                chart_h = alt.Chart(hist_df.reset_index()).mark_line(color="#8b5cf6", strokeWidth=2).encode(
+                    x='index:Q',
+                    y=alt.Y('prob_up:Q', scale=alt.Scale(domain=[min_h, max_h]))
+                ).properties(height=150)
+                st.altair_chart(chart_h, use_container_width=True)
+            else:
+                st.line_chart(hist_df.tail(30))
         except Exception:
             st.dataframe(sig_hist.tail(10), use_container_width=True)
     else:
@@ -294,6 +343,7 @@ with e2:
         else:
             st.caption("No history yet")
     st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🗓️ Calendar Heatmap (PnL per day)")
     if len(trades)>0 and "timestamp" in trades.columns and "pnl" in trades.columns:
@@ -334,7 +384,7 @@ if len(trades)>0:
         if s=="OPEN": return "background-color: #fef9c3; color:#92400e; font-weight:700"
         if s=="RESET": return "background-color: #dbeafe; color:#1e40af; font-weight:700"
         return ""
-    try:
+    try:98
         styled = trades_display.tail(20).style.applymap(color_status, subset=["status"])
         st.dataframe(styled, use_container_width=True)
     except Exception:
@@ -343,4 +393,4 @@ else:
     st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 50.7% so no trade, correct.")
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % sizing | Auto-reset 3 days | Chart fallback to live_prices.csv")
+st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | Zoomed charts to show pips")
