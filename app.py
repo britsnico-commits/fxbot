@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - With Dark Mode Toggle
+# app.py - CANIC FXBOT - FIXED CHART PLOTTING - Uses live_prices.csv fallback
 import os
 import pandas as pd
 import streamlit as st
@@ -7,11 +7,9 @@ import yfinance as yf
 
 st.set_page_config(page_title="CANIC FXBOT", page_icon="📈", layout="wide")
 
-# --- Dark Mode Toggle State ---
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# Top bar with toggle
 col_title, col_toggle = st.columns([3, 1])
 with col_title:
     st.markdown("# 📈 CANIC FXBOT")
@@ -20,56 +18,26 @@ with col_toggle:
     st.session_state.dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode, key="dm_toggle")
 
 is_dark = st.session_state.dark_mode
-
-# CSS based on mode
-if is_dark:
-    bg = "#0f172a"
-    card_bg = "#1e293b"
-    text_color = "#f1f5f9"
-    sub_text = "#94a3b8"
-    border = "#334155"
-else:
-    bg = "#f8fafc"
-    card_bg = "#ffffff"
-    text_color = "#0f172a"
-    sub_text = "#64748b"
-    border = "#f1f5f9"
+bg = "#0f172a" if is_dark else "#f8fafc"
+card_bg = "#1e293b" if is_dark else "#ffffff"
+text_color = "#f1f5f9" if is_dark else "#0f172a"
+sub_text = "#94a3b8" if is_dark else "#64748b"
+border = "#334155" if is_dark else "#f1f5f9"
 
 st.markdown(f"""
 <style>
 .stApp {{ background-color: {bg}; color: {text_color}; }}
 header {{visibility: hidden;}}
 .block-container {{padding-top: 0.5rem; padding-bottom: 2rem;}}
-.card {{
-  background: {card_bg};
-  border-radius: 18px;
-  padding: 16px 18px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-  margin-bottom: 14px;
-  border: 1px solid {border};
-  color: {text_color};
-}}
-.signal-card {{
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #92400e 100%);
-  color: white;
-  border-radius: 22px;
-  padding: 22px;
-  box-shadow: 0 10px 30px rgba(245,158,11,0.35);
-}}
-.balance-card {{
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  color: white;
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.35);
-}}
-.stat-green {{ background: {'#064e3b' if is_dark else '#ecfdf5'}; border-left: 5px solid #10b981; color: {text_color}; }}
+.card {{ background: {card_bg}; border-radius: 18px; padding: 16px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); margin-bottom: 14px; border: 1px solid {border}; color: {text_color}; }}
+.signal-card {{ background: linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #92400e 100%); color: white; border-radius: 22px; padding: 22px; box-shadow: 0 10px 30px rgba(245,158,11,0.35); }}
+.balance-card {{ background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; border-radius: 20px; padding: 20px; }}
+.stat-green {{ background: {'#064e3b' if is_dark else '#ecfdf5'}; border-left: 5px solid #10b981; }}
 .stat-blue {{ background: {'#1e3a5f' if is_dark else '#eff6ff'}; border-left: 5px solid #3b82f6; }}
 .stat-red {{ background: {'#7f1d1d' if is_dark else '#fef2f2'}; border-left: 5px solid #ef4444; }}
 .stat-purple {{ background: {'#4c1d95' if is_dark else '#f5f3ff'}; border-left: 5px solid #8b5cf6; }}
 .kill-dot {{ width:14px; height:14px; border-radius:50%; display:inline-block; animation: pulse 2s infinite; }}
 @keyframes pulse {{ 0% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0.7); }} 70% {{ box-shadow: 0 0 0 10px rgba(34,197,94,0); }} 100% {{ box-shadow: 0 0 0 0 rgba(34,197,94,0); }} }}
-.big-num {{ font-size: 38px; font-weight: 900; line-height: 1; }}
 .small-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; opacity: 0.7; font-weight: 700; color: {sub_text}; }}
 </style>
 """, unsafe_allow_html=True)
@@ -90,23 +58,33 @@ def load_csv(path):
         pass
     return pd.DataFrame()
 
-def get_live_chart():
+def get_live_chart(live_prices_df):
+    # Try Yahoo
     try:
         df = yf.download("EURUSD=X", period="1d", interval="15m", auto_adjust=True, progress=False)
-        if df is None or len(df)==0:
-            return pd.DataFrame()
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        return df
-    except Exception:
-        return pd.DataFrame()
+        if df is not None and len(df) > 10:
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            return df
+    except Exception as e:
+        print(f"Yahoo chart fail: {e}")
+    # Fallback: use your own live_prices.csv
+    try:
+        if len(live_prices_df) > 0 and "price" in live_prices_df.columns:
+            tail = live_prices_df.tail(96).copy()
+            tail["timestamp"] = pd.to_datetime(tail["timestamp"], utc=True)
+            tail = tail.set_index("timestamp")
+            tail = tail.rename(columns={"price": "Close"})
+            return tail
+    except Exception as e:
+        print(f"Fallback chart fail: {e}")
+    return pd.DataFrame()
 
 today_sig = load_csv("results/today_signal.csv")
 trades = load_csv("results/paper_trades.csv")
 live_prices = load_csv("results/live_prices.csv")
 sig_hist = load_csv("results/signal_history.csv")
 
-# Parse signal
 if len(today_sig) > 0:
     row = today_sig.iloc[-1]
     prob = float(row.get("prob_up", row.get("prob", 50)))
@@ -123,7 +101,6 @@ emoji = "🟢" if signal=="BUY" else "🔴" if signal=="SELL" else "🟡"
 adx_label = "TRENDING ✅" if adx >= 20 else "CHOPPY ⚠️"
 lean = "Lean UP 📈" if prob > 55 else "Lean DOWN 📉" if prob < 45 else "No Edge 😴"
 
-# Balance stats
 balance = 100.0; total_pnl = 0.0; wins = 0; losses = 0; closed = 0; profit_factor = 0.0; max_dd = 0.0; streak = 0; longest_win = 0; longest_loss = 0
 if len(trades) > 0 and "pnl" in trades.columns:
     pnls = []
@@ -214,13 +191,8 @@ with c2:
         <div style="background:rgba(255,255,255,0.12); padding:4px 10px; border-radius:10px; font-size:12px;">Start $100</div>
         <div style="background:{'#10b981' if total_pnl>=0 else '#ef4444'}; padding:4px 10px; border-radius:10px; font-size:12px; font-weight:800;">{total_pnl:+.2f}</div>
       </div>
-      <div style="margin-top:12px; font-size:11px; opacity:0.6;">Kill &lt; $70 • Spread 2 pips • Equity % sizing • Forex-only</div>
-      <div style="margin-top:10px; height:6px; background:rgba(255,255,255,0.15); border-radius:10px;">
-        <div style="width:{max(0,min(100, balance))}%; height:6px; background:{kill_color}; border-radius:10px;"></div>
-      </div>
     </div>
     """, unsafe_allow_html=True)
-
     lp_count = len(live_prices) if len(live_prices)>0 else 0
     pct = (lp_count/2880*100) if lp_count>0 else 0
     remaining = 2880 - lp_count
@@ -229,7 +201,7 @@ with c2:
     <div class="card">
       <div class="small-label">Live Price Points</div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-        <div class="med-num" style="font-size:28px; font-weight:800;">{lp_count} / 2880</div>
+        <div style="font-size:28px; font-weight:800;">{lp_count} / 2880</div>
         <div style="background:{'#0e7490' if is_dark else '#f0f9ff'}; color:{'#22d3ee' if is_dark else '#0369a1'}; padding:4px 10px; border-radius:20px; font-weight:800;">{pct:.2f}%</div>
       </div>
       <div style="height:10px; background:{'#334155' if is_dark else '#e2e8f0'}; border-radius:20px; margin-top:10px;">
@@ -241,18 +213,16 @@ with c2:
     </div>
     """, unsafe_allow_html=True)
 
-# Stats 4 cards
 s1, s2, s3, s4 = st.columns(4)
 with s1:
-    st.markdown(f"""<div class="card stat-green"><div class="small-label">Win Rate</div><div class="big-num" style="font-size:32px; font-weight:900;">{win_rate:.1f}%</div><div style="font-size:12px; margin-top:4px;">{wins}W / {losses}L • {closed} closed</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="card stat-green"><div class="small-label">Win Rate</div><div style="font-size:32px; font-weight:900;">{win_rate:.1f}%</div><div style="font-size:12px; margin-top:4px;">{wins}W / {losses}L • {closed} closed</div></div>""", unsafe_allow_html=True)
 with s2:
-    st.markdown(f"""<div class="card stat-blue"><div class="small-label">Profit Factor</div><div class="big-num" style="font-size:32px; font-weight:900;">{profit_factor:.2f}</div><div style="font-size:12px; margin-top:4px;">Gross Profit / Gross Loss</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="card stat-blue"><div class="small-label">Profit Factor</div><div style="font-size:32px; font-weight:900;">{profit_factor:.2f}</div></div>""", unsafe_allow_html=True)
 with s3:
-    st.markdown(f"""<div class="card stat-red"><div class="small-label">Max Drawdown</div><div class="big-num" style="font-size:32px; font-weight:900;">-${max_dd:.2f}</div><div style="font-size:12px; margin-top:4px;">Peak to trough</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="card stat-red"><div class="small-label">Max Drawdown</div><div style="font-size:32px; font-weight:900;">-${max_dd:.2f}</div></div>""", unsafe_allow_html=True)
 with s4:
-    st.markdown(f"""<div class="card stat-purple"><div class="small-label">Streak</div><div class="big-num" style="font-size:32px; font-weight:900;">{streak} {streak_type}</div><div style="font-size:12px; margin-top:4px;">Best W{longest_win} / L{longest_loss}</div></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="card stat-purple"><div class="small-label">Streak</div><div style="font-size:32px; font-weight:900;">{streak} {streak_type}</div><div style="font-size:12px; margin-top:4px;">Best W{longest_win} / L{longest_loss}</div></div>""", unsafe_allow_html=True)
 
-# Middle row
 e1, e2 = st.columns([1.3, 1])
 
 with e1:
@@ -266,12 +236,11 @@ with e1:
                     eq.append(eq[-1]+float(r.get("pnl",0) or 0))
             except Exception:
                 pass
-        st.line_chart(eq)
+        st.line_chart(pd.DataFrame({"Equity": eq}))
     else:
-        st.line_chart([100.0])
+        st.line_chart(pd.DataFrame({"Equity": [100.0]}))
         st.caption("No trades yet — curve will move after first win/loss")
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🎯 Confidence Distribution")
     if len(trades)>0 and "prob" in trades.columns:
@@ -296,15 +265,21 @@ with e1:
 with e2:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 💱 Live EUR/USD — Last 24h (15m)")
-    chart_df = get_live_chart()
-    if len(chart_df)>0:
-        st.line_chart(chart_df["Close"])
+    chart_df = get_live_chart(live_prices)
+    if len(chart_df)>0 and "Close" in chart_df.columns:
+        # Fix Y-axis: filter to EUR/USD realistic range 1.0-1.2
+        try:
+            st.line_chart(chart_df["Close"])
+        except Exception:
+            st.line_chart(chart_df)
         if len(live_prices)>0:
             st.dataframe(live_prices.tail(3), use_container_width=True)
+        st.caption(f"Source: {'Yahoo 15m' if len(chart_df)>20 else 'Your live_prices.csv fallback'} — {len(chart_df)} points")
     else:
-        st.caption("Chart unavailable (Yahoo 429) — using fallback")
+        st.warning("Chart empty — Yahoo blocked + no live_prices.csv yet. Will plot after 2 live points (30m)")
+        if len(live_prices)>0:
+            st.dataframe(live_prices.tail(5), use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🔮 Signal History + ADX Trend")
     if len(sig_hist)>0:
@@ -314,12 +289,11 @@ with e2:
             st.dataframe(sig_hist.tail(10), use_container_width=True)
     else:
         if len(today_sig)>0:
-            st.line_chart([prob])
+            st.line_chart(pd.DataFrame({"prob": [prob]}))
             st.caption("1 signal — history builds after 2-3 days")
         else:
             st.caption("No history yet")
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🗓️ Calendar Heatmap (PnL per day)")
     if len(trades)>0 and "timestamp" in trades.columns and "pnl" in trades.columns:
@@ -334,10 +308,8 @@ with e2:
         st.caption("No trades yet — heatmap will show green/red days")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Trade History
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("#### 📋 Paper Trade History")
-
 if len(trades)>0:
     def countdown(ts_str):
         try:
@@ -369,7 +341,6 @@ if len(trades)>0:
         st.dataframe(trades_display.tail(20), use_container_width=True)
 else:
     st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 50.7% so no trade, correct.")
-
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill-switch < $70 | Spread 2 pips | Forex-only | Equity % sizing | Auto-reset 3 days")
+st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % sizing | Auto-reset 3 days | Chart fallback to live_prices.csv")
