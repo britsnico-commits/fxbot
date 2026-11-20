@@ -1,4 +1,4 @@
-# app.py - CANIC FXBOT - FINAL - All charts zoomed to show movement
+# app.py - CANIC FXBOT - FINAL - No tooltips, fixed prob scale 45-55
 import os
 import pandas as pd
 import streamlit as st
@@ -244,7 +244,7 @@ with e1:
             eq_chart = alt.Chart(eq_df).mark_line(color="#10b981", strokeWidth=3).encode(
                 x=alt.X('idx:Q', title='Trades'),
                 y=alt.Y('Equity:Q', scale=alt.Scale(domain=[min_e, max_e]), title='Balance $')
-            ).properties(height=220).interactive()
+            ).properties(height=220)
             st.altair_chart(eq_chart, use_container_width=True)
         except Exception:
             st.line_chart(pd.DataFrame({"Equity": eq}))
@@ -259,11 +259,9 @@ with e1:
         probs = []
         for _, r in trades.iterrows():
             try:
-                if str(r.get("type","")).upper()=="RESET":
-                    continue
+                if str(r.get("type","")).upper()=="RESET": continue
                 p = float(r.get("prob",0))
-                if 0 < p <= 1:
-                    p *= 100
+                if 0 < p <= 1: p *= 100
                 probs.append(p)
             except Exception:
                 pass
@@ -300,9 +298,8 @@ with e2:
                 y_max = max_p + pad
             chart = alt.Chart(df_plot).mark_line(color="#0ea5e9", strokeWidth=3, point=alt.OverlayMarkDef(color="#0ea5e9", size=30)).encode(
                 x=alt.X('timestamp:T', title='Time'),
-                y=alt.Y('Close:Q', title='EUR/USD', scale=alt.Scale(domain=[y_min, y_max])),
-                tooltip=['timestamp:T', 'Close:Q']
-            ).properties(height=300).interactive()
+                y=alt.Y('Close:Q', title='EUR/USD', scale=alt.Scale(domain=[y_min, y_max]))
+            ).properties(height=300)
             st.altair_chart(chart, use_container_width=True)
             move_pips = (max_p - min_p) * 10000
             st.caption(f"🔍 Zoomed: {y_min:.5f} - {y_max:.5f} | Move: {move_pips:.1f} pips | {len(df_plot)} points")
@@ -323,7 +320,9 @@ with e2:
         try:
             import altair as alt
             hist_df = sig_hist.tail(30).copy()
+            # Fix prob scale: if stored as 0.477, convert to 47.7
             if "prob_up" in hist_df.columns:
+                hist_df["prob_up"] = hist_df["prob_up"].apply(lambda x: x*100 if 0 < x <= 1 else x)
                 hist_df = hist_df.reset_index()
                 min_h = float(hist_df["prob_up"].min()) - 0.5
                 max_h = float(hist_df["prob_up"].max()) + 0.5
@@ -333,9 +332,8 @@ with e2:
                     min_h -= 1; max_h += 1
                 chart_h = alt.Chart(hist_df).mark_line(color="#8b5cf6", strokeWidth=3, point=alt.OverlayMarkDef(color="#8b5cf6", size=40)).encode(
                     x=alt.X('index:Q', title='Signals'),
-                    y=alt.Y('prob_up:Q', title='Prob %', scale=alt.Scale(domain=[min_h, max_h])),
-                    tooltip=['prob_up']
-                ).properties(height=200).interactive()
+                    y=alt.Y('prob_up:Q', title='Prob %', scale=alt.Scale(domain=[min_h, max_h]))
+                ).properties(height=200)
                 st.altair_chart(chart_h, use_container_width=True)
                 st.caption(f"Zoomed {min_h:.1f}% - {max_h:.1f}% | Last {len(hist_df)} signals | 45/55 rule")
             else:
@@ -370,7 +368,7 @@ st.markdown("#### 📋 Paper Trade History")
 if len(trades)>0:
     st.dataframe(trades.tail(20), use_container_width=True)
 else:
-    st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 50.7% so no trade, correct.")
+    st.info("No trades yet — will open when prob >55% or <45% and ADX ≥20. Today is HOLD 47.7% so no trade, correct.")
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | Equity % | Auto-reset 3 days | All charts zoomed")
+st.caption(f"{'🌙 Dark' if is_dark else '☀️ Light'} Mode | Last refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Kill < $70 | Spread 2 pips | Forex-only | No tooltips")
