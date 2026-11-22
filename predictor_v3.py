@@ -42,13 +42,14 @@ def check_previous_prediction(df):
 
         if pred_signal == "HOLD":
             print("\n=== DAILY AUDIT ===")
-            print(f"{pred_date} | HOLD signal skipped")
+            print(f"{prediction_bar_date} | HOLD signal skipped")
             return
 
         dates = list(df.index.date)
 
         if prediction_bar_date not in dates:
-           return
+         return
+
 
         idx = dates.index(prediction_bar_date)
 
@@ -63,16 +64,16 @@ def check_previous_prediction(df):
 
         correct = actual_move == pred_signal
 
-    print("\n=== DAILY AUDIT ===")
-    
-    forecast_day = dates[idx + 1]
-    
-    print(
-      f"Forecast for {forecast_day} | "
-      f"Predicted={pred_signal} | "
-      f"Actual={actual_move} | "
-      f"{'✅ CORRECT' if correct else '❌ WRONG'}"
-)
+        print("\n=== DAILY AUDIT ===")
+
+        forecast_day = dates[idx + 1]
+
+        print(
+            f"Forecast for {forecast_day} | "
+            f"Predicted={pred_signal} | "
+            f"Actual={actual_move} | "
+            f"{'✅ CORRECT' if correct else '❌ WRONG'}"
+        )
 
 
         if os.path.exists(AUDIT_FILE):
@@ -88,11 +89,14 @@ def check_previous_prediction(df):
             )
 
         new_row = pd.DataFrame([{
-            "date": str(forecast_day),
-            "predicted": pred_signal,
-            "actual": actual_move,
-            "correct": correct
-        }])
+    "date": str(forecast_day),
+    "predicted": pred_signal,
+    "actual": actual_move,
+    "correct": correct,
+    "entry_price": prev["price"],
+    "prob_up": prev["prob_up"]
+}])
+
 
         audit = pd.concat(
             [audit, new_row],
