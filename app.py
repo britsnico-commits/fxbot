@@ -287,28 +287,27 @@ with s5:
             else "❌"
         )
 
-    st.markdown(
-        f"""
-        <div class="card stat-blue">
-            <div class="small-label">
-                Prediction Accuracy
-            </div>
-
-            <div style="font-size:32px;font-weight:900;">
-                {pred_accuracy:.1f}%
-            </div>
-
-            <div style="font-size:12px;margin-top:4px;">
-                {pred_correct}/{pred_total} Correct
-            </div>
-
-            <div style="font-size:12px;margin-top:4px;">
-                Last: {last_result}
-            </div>
+    html = f"""
+    <div class="card stat-blue">
+        <div class="small-label">
+            Prediction Accuracy
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+
+        <div style="font-size:32px;font-weight:900;">
+            {pred_accuracy:.1f}%
+        </div>
+
+        <div style="font-size:12px;margin-top:4px;">
+            {pred_correct}/{pred_total} Correct
+        </div>
+
+        <div style="font-size:12px;margin-top:4px;">
+            Last: {last_result}
+        </div>
+    </div>
+    """
+
+    st.markdown(html, unsafe_allow_html=True)
 
 e1, e2 = st.columns([1.3, 1])
 
