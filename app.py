@@ -82,6 +82,33 @@ today_sig = load_csv("results/today_signal.csv")
 trades = load_csv("results/paper_trades.csv")
 live_prices = load_csv("results/live_prices.csv")
 sig_hist = load_csv("results/signal_history.csv")
+audit_log = load_csv("results/audit_log.csv")
+
+# =========================
+# Prediction Audit Stats
+# =========================
+pred_accuracy = 0.0
+pred_correct = 0
+pred_total = 0
+latest_audit = None
+
+if len(audit_log) > 0:
+
+    pred_total = len(audit_log)
+
+    if "correct" in audit_log.columns:
+        pred_correct = (
+            audit_log["correct"]
+            .astype(str)
+            .str.lower()
+            .eq("true")
+            .sum()
+        )
+
+    if pred_total > 0:
+        pred_accuracy = pred_correct / pred_total * 100
+
+    latest_audit = audit_log.iloc[-1]
 
 if len(today_sig) > 0:
     row = today_sig.iloc[-1]
@@ -191,27 +218,56 @@ with c2:
       </div>
     </div>
     """, unsafe_allow_html=True)
-    lp_count = len(live_prices) if len(live_prices)>0 else 0
-    pct = (lp_count/2880*100) if lp_count>0 else 0
-    remaining = 2880 - lp_count
-    days_left = remaining * 0.25 / 24
-    st.markdown(f"""
-    <div class="card">
-      <div class="small-label">Live Price Points</div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-        <div style="font-size:28px; font-weight:800;">{lp_count} / 2880</div>
-        <div style="background:{'#0e7490' if is_dark else '#f0f9ff'}; color:{'#22d3ee' if is_dark else '#0369a1'}; padding:4px 10px; border-radius:20px; font-weight:800;">{pct:.2f}%</div>
-      </div>
-      <div style="height:10px; background:{'#334155' if is_dark else '#e2e8f0'}; border-radius:20px; margin-top:10px;">
-        <div style="width:{pct:.2f}%; height:10px; background:linear-gradient(90deg, #0ea5e9, #22d3ee); border-radius:20px;"></div>
-      </div>
-      <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:12px; opacity:0.7;">
-        <span>⏱️ {days_left:.1f} days left</span><span>1 point / 15m</span>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
 
-s1, s2, s3, s4 = st.columns(4)
+    if latest_audit is not None:
+
+        audit_result = (
+            "✅ CORRECT"
+            if str(latest_audit["correct"]).lower() == "true"
+            else "❌ WRONG"
+        )
+
+        pred_conf = float(
+            latest_audit.get("prob_up", 0)
+        )
+
+        if 0 < pred_conf <= 1:
+            pred_conf *= 100
+
+        entry_price = float(
+            latest_audit.get("entry_price", 0)
+        )
+
+        st.markdown(f"""
+        <div class="card">
+            <div class="small-label">
+                Yesterday's Prediction
+            </div>
+
+            <div style="font-size:24px;font-weight:900;margin-top:4px;">
+                {audit_result}
+            </div>
+
+            <div style="margin-top:10px;">
+                Signal: <b>{latest_audit['predicted']}</b>
+            </div>
+
+            <div>
+                Actual: <b>{latest_audit['actual']}</b>
+            </div>
+
+            <div>
+                Confidence: <b>{pred_conf:.1f}%</b>
+            </div>
+
+            <div>
+                Entry: <b>{entry_price:.4f}</b>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
     st.markdown(f"""<div class="card stat-green"><div class="small-label">Win Rate</div><div style="font-size:32px; font-weight:900;">{win_rate:.1f}%</div><div style="font-size:12px; margin-top:4px;">{wins}W / {losses}L • {closed} closed</div></div>""", unsafe_allow_html=True)
 with s2:
@@ -220,6 +276,37 @@ with s3:
     st.markdown(f"""<div class="card stat-red"><div class="small-label">Max Drawdown</div><div style="font-size:32px; font-weight:900;">-${max_dd:.2f}</div></div>""", unsafe_allow_html=True)
 with s4:
     st.markdown(f"""<div class="card stat-purple"><div class="small-label">Streak</div><div style="font-size:32px; font-weight:900;">{streak} {streak_type}</div><div style="font-size:12px; margin-top:4px;">Best W{longest_win} / L{longest_loss}</div></div>""", unsafe_allow_html=True)
+with s5:
+
+    last_result = "—"
+
+    if latest_audit is not None:
+
+        last_result = (
+            "✅"
+            if str(latest_audit["correct"]).lower() == "true"
+            else "❌"
+        )
+
+    st.markdown(f"""
+    <div class="card stat-blue">
+        <div class="small-label">
+            Prediction Accuracy
+        </div>
+
+        <div style="font-size:32px; font-weight:900;">
+            {pred_accuracy:.1f}%
+        </div>
+
+        <div style="font-size:12px; margin-top:4px;">
+            {pred_correct}/{pred_total} Correct
+        </div>
+
+        <div style="font-size:12px; margin-top:4px;">
+            Last: {last_result}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 e1, e2 = st.columns([1.3, 1])
 
@@ -348,20 +435,40 @@ with e2:
         else:
             st.caption("No history yet")
     st.markdown('</div>', unsafe_allow_html=True)
-
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown("#### 🗓️ Calendar Heatmap (PnL per day)")
+
     if len(trades)>0 and "timestamp" in trades.columns and "pnl" in trades.columns:
         try:
             t = trades.copy()
-            t["date"] = pd.to_datetime(t["timestamp"], utc=True).dt.date
-            daily = t.groupby("date")["pnl"].sum().reset_index()
-            st.dataframe(daily.tail(10), use_container_width=True)
+            t["date"] = pd.to_datetime(
+                t["timestamp"],
+                utc=True
+            ).dt.date
+
+            daily = (
+                t.groupby("date")["pnl"]
+                .sum()
+                .reset_index()
+            )
+
+            st.dataframe(
+                daily.tail(10),
+                use_container_width=True
+            )
+
         except Exception as e:
-            st.caption(f"No calendar yet: {e}")
+            st.caption(
+                f"No calendar yet: {e}"
+            )
+
     else:
-        st.caption("No trades yet — heatmap will show green/red days")
+        st.caption(
+            "No trades yet — heatmap will show green/red days"
+        )
+
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown("#### 📋 Paper Trade History")
