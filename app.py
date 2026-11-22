@@ -287,27 +287,14 @@ with s5:
             else "❌"
         )
 
-    html = f"""
-    <div class="card stat-blue">
-        <div class="small-label">
-            Prediction Accuracy
-        </div>
+    st.metric(
+        label="Prediction Accuracy",
+        value=f"{pred_accuracy:.1f}%"
+    )
 
-        <div style="font-size:32px;font-weight:900;">
-            {pred_accuracy:.1f}%
-        </div>
-
-        <div style="font-size:12px;margin-top:4px;">
-            {pred_correct}/{pred_total} Correct
-        </div>
-
-        <div style="font-size:12px;margin-top:4px;">
-            Last: {last_result}
-        </div>
-    </div>
-    """
-
-    st.markdown(html, unsafe_allow_html=True)
+    st.caption(
+        f"{pred_correct}/{pred_total} Correct | Last: {last_result}"
+    )
 
 e1, e2 = st.columns([1.3, 1])
 
