@@ -103,7 +103,22 @@ trades_path = "results/paper_trades.csv"
 if os.path.exists(trades_path):
     trades = pd.read_csv(trades_path)
 else:
-    trades = pd.DataFrame(columns=["timestamp","signal","prob","price","stake","type","pnl","status","spread_cost","entry_price_real"])
+    trades = pd.DataFrame(
+        columns=[
+            "timestamp",
+            "signal",
+            "prob",
+            "price",
+            "stake",
+            "type",
+            "pnl",
+            "status",
+            "spread_cost",
+            "entry_price_real"
+        ]
+    )
+
+    trades.to_csv(trades_path, index=False)
 
 balance = get_balance(trades)
 print(f"Current balance: ${balance:.2f} | Open trades: {has_open_trades(trades)} | Days since last: {days_since_last_trade(trades)}")
