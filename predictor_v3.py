@@ -17,6 +17,103 @@ from datetime import datetime, timezone, timedelta
 
 os.makedirs("results", exist_ok=True)
 
+# =========================
+# Prediction audit files
+# =========================
+AUDIT_FILE = "results/audit_log.csv"
+HISTORY_FILE = "results/prediction_history.csv"
+
+def check_previous_prediction(df):
+    if not os.path.exists(HISTORY_FILE):
+        print("\n=== DAILY AUDIT ===")
+        print("No previous prediction history found.")
+        return
+
+    try:
+        hist = pd.read_csv(HISTORY_FILE)
+
+        if len(hist) == 0:
+            return
+
+        prev = hist.iloc[-1]
+
+        pred_date = pd.to_datetime(prev["date"]).date()
+        pred_signal = str(prev["signal"]).upper()
+
+        if pred_signal == "HOLD":
+            print("\n=== DAILY AUDIT ===")
+            print(f"{pred_date} | HOLD signal skipped")
+            return
+
+        dates = list(df.index.date)
+
+        if pred_date not in dates:
+            return
+
+        idx = dates.index(pred_date)
+
+        if idx + 1 >= len(df):
+            return
+
+        actual_move = (
+            "BUY"
+            if df.iloc[idx + 1]["eurusd"] > df.iloc[idx]["eurusd"]
+            else "SELL"
+        )
+
+        correct = actual_move == pred_signal
+
+        print("\n=== DAILY AUDIT ===")
+        print(
+            f"{pred_date} | "
+            f"Predicted={pred_signal} | "
+            f"Actual={actual_move} | "
+            f"{'✅ CORRECT' if correct else '❌ WRONG'}"
+        )
+
+        if os.path.exists(AUDIT_FILE):
+            audit = pd.read_csv(AUDIT_FILE)
+        else:
+            audit = pd.DataFrame(
+                columns=[
+                    "date",
+                    "predicted",
+                    "actual",
+                    "correct"
+                ]
+            )
+
+        new_row = pd.DataFrame([{
+            "date": str(pred_date),
+            "predicted": pred_signal,
+            "actual": actual_move,
+            "correct": correct
+        }])
+
+        audit = pd.concat(
+            [audit, new_row],
+            ignore_index=True
+        )
+
+        audit.drop_duplicates(
+            subset=["date"],
+            keep="last",
+            inplace=True
+        )
+
+        audit.to_csv(AUDIT_FILE, index=False)
+
+        accuracy = audit["correct"].mean() * 100
+
+        print(
+            f"Running Accuracy: "
+            f"{accuracy:.2f}% "
+            f"({audit['correct'].sum()}/{len(audit)})"
+        )
+
+    except Exception as e:
+        print(f"Audit error: {e}")
+
 TICKERS = {
     "eurusd": "EURUSD=X",
     "eurgbp": "EURGBP=X",
@@ -190,6 +287,54 @@ out = pd.DataFrame([{
     "signal": "BUY" if prob_up > 0.55 else ("SELL" if prob_up < 0.45 else "HOLD"),
     "model": "FOREX_ONLY_ENSEMBLE_COMPLETED_BARS",
 }])
-out.to_csv("results/predictions.csv", index=False)
-print(f"\nWrote results/predictions.csv: date={last_date} price={last_price:.4f} prob_up={prob_up*100:.1f}% signal={out.iloc[0]['signal']}")
-print("FIXED: Uses only completed bars, no fake ECB/Fed features, ensemble is real ensemble accuracy.")
+# ===================================
+# Evaluate previous prediction
+# ===================================
+check_previous_prediction(df)
+
+# ===================================
+# Save prediction history
+# ===================================
+if os.path.exists(HISTORY_FILE):
+
+    history = pd.read_csv(HISTORY_FILE)
+
+    duplicate = (
+        history["date"].astype(str)
+        == str(last_date)
+    ).any()
+
+    if not duplicate:
+        history = pd.concat(
+            [history, out],
+            ignore_index=True
+        )
+else:
+    history = out.copy()
+
+history.to_csv(HISTORY_FILE, index=False)
+
+# Latest prediction
+out.to_csv(
+    "results/predictions.csv",
+    index=False
+)
+
+print(
+    f"\nWrote results/predictions.csv: "
+    f"date={last_date} "
+    f"price={last_price:.4f} "
+    f"prob_up={prob_up*100:.1f}% "
+    f"signal={out.iloc[0]['signal']}"
+)
+
+print(
+    f"Prediction history rows: "
+    f"{len(history)}"
+)
+
+print(
+    "FIXED: Uses only completed bars, "
+    "no fake ECB/Fed features, "
+    "ensemble is real ensemble accuracy."
+)
