@@ -327,6 +327,10 @@ out.to_csv(
     "results/predictions.csv",
     index=False
 )
+out.to_csv(
+    "results/today_signal.csv",
+    index=False
+)
 
 print(
     f"\nWrote results/predictions.csv: "
