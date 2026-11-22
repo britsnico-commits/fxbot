@@ -37,7 +37,7 @@ def check_previous_prediction(df):
 
         prev = hist.iloc[-1]
 
-        pred_date = pd.to_datetime(prev["date"]).date()
+        prediction_bar_date = pd.to_datetime(prev["date"]).date()
         pred_signal = str(prev["signal"]).upper()
 
         if pred_signal == "HOLD":
@@ -47,10 +47,10 @@ def check_previous_prediction(df):
 
         dates = list(df.index.date)
 
-        if pred_date not in dates:
-            return
+        if prediction_bar_date not in dates:
+           return
 
-        idx = dates.index(pred_date)
+        idx = dates.index(prediction_bar_date)
 
         if idx + 1 >= len(df):
             return
@@ -63,13 +63,17 @@ def check_previous_prediction(df):
 
         correct = actual_move == pred_signal
 
-        print("\n=== DAILY AUDIT ===")
-        print(
-            f"{pred_date} | "
-            f"Predicted={pred_signal} | "
-            f"Actual={actual_move} | "
-            f"{'✅ CORRECT' if correct else '❌ WRONG'}"
-        )
+    print("\n=== DAILY AUDIT ===")
+    
+    forecast_day = dates[idx + 1]
+    
+    print(
+      f"Forecast for {forecast_day} | "
+      f"Predicted={pred_signal} | "
+      f"Actual={actual_move} | "
+      f"{'✅ CORRECT' if correct else '❌ WRONG'}"
+)
+
 
         if os.path.exists(AUDIT_FILE):
             audit = pd.read_csv(AUDIT_FILE)
@@ -84,7 +88,7 @@ def check_previous_prediction(df):
             )
 
         new_row = pd.DataFrame([{
-            "date": str(pred_date),
+            "date": str(forecast_day),
             "predicted": pred_signal,
             "actual": actual_move,
             "correct": correct
