@@ -121,6 +121,9 @@ def check_previous_prediction(df):
             "move_pct": round(move_pct, 3)
         }])
 
+print("WRITING AUDIT ROW")
+print(new_row)
+        
         audit = pd.concat(
             [audit, new_row],
             ignore_index=True
