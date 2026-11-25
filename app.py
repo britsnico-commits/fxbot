@@ -238,11 +238,11 @@ with c2:
             latest_audit.get("entry_price", 0)
         )
 
-        st.markdown(f"### {audit_result}")
+        st.markdown("##### LAST AUDITED PREDICTION")
 
         st.markdown(
-            f"**Signal:** {latest_audit['predicted']}"
-        )
+    f"### {latest_audit['predicted']} → {audit_result}"
+)
 
         st.markdown(
             f"**Actual:** {latest_audit['actual']}"
