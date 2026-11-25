@@ -22,10 +22,11 @@ os.makedirs("results", exist_ok=True)
 # =========================
 AUDIT_FILE = "results/audit_log.csv"
 HISTORY_FILE = "results/prediction_history.csv"
+HOLD_MOVE_THRESHOLD = 0.20
 
-HOLD_MOVE_THRESHOLD = 0.20  # Percent move allowed for HOLD
-
+    
 def check_previous_prediction(df):
+
     if not os.path.exists(HISTORY_FILE):
         print("\n=== DAILY AUDIT ===")
         print("No previous prediction history found.")
@@ -39,65 +40,59 @@ def check_previous_prediction(df):
 
         prev = hist.iloc[-1]
 
-        prediction_bar_date = pd.to_datetime(prev["date"]).date()
-        pred_signal = str(prev["signal"]).upper()
+        prediction_bar_date = pd.to_datetime(
+            prev["date"]
+        ).date()
+
+        pred_signal = str(
+            prev["signal"]
+        ).upper()
 
         dates = list(df.index.date)
 
         if prediction_bar_date not in dates:
-         return
+            return
 
+        idx = dates.index(prediction_bar_date)
 
-idx = dates.index(prediction_bar_date)
+        if idx + 1 >= len(df):
+            return
 
-if idx + 1 >= len(df):
-    return
+        current_price = float(
+            df.iloc[idx]["eurusd"]
+        )
 
-current_price = float(
-    df.iloc[idx]["eurusd"]
-)
+        next_price = float(
+            df.iloc[idx + 1]["eurusd"]
+        )
 
-next_price = float(
-    df.iloc[idx + 1]["eurusd"]
-)
+        move_pct = (
+            (next_price - current_price)
+            / current_price
+        ) * 100
 
-move_pct = (
-    (next_price - current_price)
-    / current_price
-) * 100
+        actual_move = (
+            "BUY"
+            if next_price > current_price
+            else "SELL"
+        )
 
-actual_move = (
-    "BUY"
-    if next_price > current_price
-    else "SELL"
-)
-
-if pred_signal == "HOLD":
-
-    correct = (
-        abs(move_pct)
-        < HOLD_MOVE_THRESHOLD
-    )
-
-else:
-
-    correct = (
-        actual_move
-        == pred_signal
-    )
-
-
+        if pred_signal == "HOLD":
+            correct = abs(move_pct) < HOLD_MOVE_THRESHOLD
+        else:
+            correct = actual_move == pred_signal
+ 
         print("\n=== DAILY AUDIT ===")
 
         forecast_day = dates[idx + 1]
 
         print(
-    f"Forecast for {forecast_day} | "
-    f"Predicted={pred_signal} | "
-    f"Actual={actual_move} | "
-    f"Move={move_pct:+.3f}% | "
-    f"{'✅ CORRECT' if correct else '❌ WRONG'}"
-)
+            f"Forecast for {forecast_day} | "
+            f"Predicted={pred_signal} | "
+            f"Actual={actual_move} | "
+            f"Move={move_pct:+.3f}% | "
+            f"{'✅ CORRECT' if correct else '❌ WRONG'}"
+        )
 
         if os.path.exists(AUDIT_FILE):
             audit = pd.read_csv(AUDIT_FILE)
@@ -114,18 +109,15 @@ else:
                 ]
             )
 
-
         new_row = pd.DataFrame([{
-    "date": str(forecast_day),
-    "predicted": pred_signal,
-    "actual": actual_move,
-    "correct": correct,
-    "entry_price": prev["price"],
-    "prob_up": prev["prob_up"],
-    "move_pct": round(move_pct, 3)
-}])
-
-
+            "date": str(forecast_day),
+            "predicted": pred_signal,
+            "actual": actual_move,
+            "correct": correct,
+            "entry_price": prev["price"],
+            "prob_up": prev["prob_up"],
+            "move_pct": round(move_pct, 3)
+        }])
 
         audit = pd.concat(
             [audit, new_row],
@@ -138,9 +130,15 @@ else:
             inplace=True
         )
 
-        audit.to_csv(AUDIT_FILE, index=False)
+        audit.to_csv(
+            AUDIT_FILE,
+            index=False
+        )
 
-        accuracy = audit["correct"].mean() * 100
+        accuracy = (
+            audit["correct"].mean()
+            * 100
+        )
 
         print(
             f"Running Accuracy: "
@@ -150,6 +148,7 @@ else:
 
     except Exception as e:
         print(f"Audit error: {e}")
+
 
 TICKERS = {
     "eurusd": "EURUSD=X",
