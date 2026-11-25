@@ -249,6 +249,10 @@ with c2:
         )
 
         st.markdown(
+            f"**Signal:** {latest_audit['predicted']}"
+        )
+
+        st.markdown(
             f"**Actual:** {latest_audit['actual']}"
         )
 
