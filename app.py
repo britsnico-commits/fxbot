@@ -238,22 +238,24 @@ with c2:
             latest_audit.get("entry_price", 0)
         )
 
-        st.markdown(f"""
+        st.markdown(f"### {audit_result}")
+
         st.markdown(
-    f"### {audit_result}"
-)
+            f"**Signal:** {latest_audit['predicted']}"
+        )
 
-st.markdown(f"**Signal:** {latest_audit['predicted']}"
-)
+        st.markdown(
+            f"**Actual:** {latest_audit['actual']}"
+        )
 
-st.markdown(f"**Actual:** {latest_audit['actual']}"
-)
+        st.markdown(
+            f"**Confidence:** {pred_conf:.1f}%"
+        )
 
-st.markdown(f"**Confidence:** {pred_conf:.1f}%"
-)
+        st.markdown(
+            f"**Entry:** {entry_price:.4f}"
+        )
 
-st.markdown(f"**Entry:** {entry_price:.4f}"
-)
 
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
