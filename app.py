@@ -242,7 +242,11 @@ with c2:
 
         st.markdown(
     f"### {latest_audit['predicted']} → {audit_result}"
-)
+        )
+        
+        st.markdown(
+            f"**Prediction Date:** {latest_audit['date']}"
+        )
 
         st.markdown(
             f"**Actual:** {latest_audit['actual']}"
