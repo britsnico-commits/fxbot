@@ -253,6 +253,10 @@ with c2:
         )
 
         st.markdown(
+            f"**Move:** {latest_audit['move_pct']:+.3f}%"
+        )
+        
+        st.markdown(
             f"**Entry:** {entry_price:.4f}"
         )
 
