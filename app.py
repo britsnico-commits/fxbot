@@ -242,6 +242,7 @@ with c2:
         <div class="card">
             <div class="small-label">
                 Yesterday's Prediction
+                test123
             </div>
 
             <div style="font-size:24px;font-weight:900;margin-top:4px;">
