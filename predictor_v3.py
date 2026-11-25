@@ -111,6 +111,8 @@ def check_previous_prediction(df):
 
         new_row = pd.DataFrame([{
             "date": str(forecast_day),
+            "prediction_date": str(prediction_bar_date),
+            "outcome_date": str(forecast_day),
             "predicted": pred_signal,
             "actual": actual_move,
             "correct": correct,
