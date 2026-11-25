@@ -1,2 +1,2 @@
 date,pred_date,prob_up,prob,signal,raw_signal,rule,adx,adx_note,price,source
-2026-11-25 08:09,2026-11-23,50.8,50.8,HOLD,HOLD,45/55 Threshold,22.6,"TRENDING, trade allowed (was HOLD)",1.0972,PREDICTOR_FRESH
+2026-11-25 22:58,2026-11-23,50.8,50.8,HOLD,HOLD,45/55 Threshold,22.5,"TRENDING, trade allowed (was HOLD)",1.0972,PREDICTOR_FRESH
