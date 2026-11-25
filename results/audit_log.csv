@@ -1,0 +1,2 @@
+date,predicted,actual,correct,entry_price,prob_up,move_pct
+2026-11-23,BUY,BUY,True,1.0969723463058472,0.617139809861031,0.016
