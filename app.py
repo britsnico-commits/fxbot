@@ -239,34 +239,25 @@ with c2:
         )
 
         st.markdown(f"""
-        <div class="card">
-            <div class="small-label">
-                Yesterday's Prediction
-                test123
-            </div>
+        st.markdown(
+    f"### {audit_result}"
+)
 
-            <div style="font-size:24px;font-weight:900;margin-top:4px;">
-                {audit_result}
-            </div>
+st.markdown(
+    f"**Signal:** {latest_audit['predicted']}"
+)
 
-            <div style="margin-top:10px;">
-                Signal: <b>{latest_audit['predicted']}</b>
-            </div>
+st.markdown(
+    f"**Actual:** {latest_audit['actual']}"
+)
 
-            <div>
-                Actual: <b>{latest_audit['actual']}</b>
-            </div>
+st.markdown(
+    f"**Confidence:** {pred_conf:.1f}%"
+)
 
-            <div>
-                Confidence: <b>{pred_conf:.1f}%</b>
-            </div>
-
-            <div>
-                Entry: <b>{entry_price:.4f}</b>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+st.markdown(
+    f"**Entry:** {entry_price:.4f}"
+)
 
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
