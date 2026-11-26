@@ -238,33 +238,34 @@ with c2:
             latest_audit.get("entry_price", 0)
         )
 
-st.markdown("##### LAST AUDITED PREDICTION")
+        st.markdown("##### LAST AUDITED PREDICTION")
 
-st.markdown(
-    f"### {latest_audit['predicted']} → {audit_result}"
-)
+        st.markdown(
+            f"### {latest_audit['predicted']} → {audit_result}"
+        )
 
-prediction_date = latest_audit.get(
-    "prediction_date",
-    latest_audit.get("date", "Unknown")
-)
+        prediction_date = latest_audit.get(
+            "prediction_date",
+            latest_audit.get("date", "Unknown")
+        )
 
-outcome_date = latest_audit.get(
-    "outcome_date",
-    latest_audit.get("date", "Unknown")
-)
+        outcome_date = latest_audit.get(
+            "outcome_date",
+            latest_audit.get("date", "Unknown")
+        )
 
-st.markdown(
-    f"**Prediction Date:** {prediction_date}"
-)
+        st.markdown(
+            f"**Prediction Date:** {prediction_date}"
+        )
 
-st.markdown(
-    f"**Outcome Date:** {outcome_date}"
-)
+        st.markdown(
+            f"**Outcome Date:** {outcome_date}"
+        )
 
         st.markdown(
             f"**Actual:** {latest_audit['actual']}"
         )
+
 
         st.markdown(
             f"**Confidence:** {pred_conf:.1f}%"
