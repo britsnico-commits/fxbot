@@ -240,12 +240,25 @@ with c2:
 
         st.markdown("##### LAST AUDITED PREDICTION")
 
+        st.markdown(f"### {latest_audit['predicted']} → {audit_result}"
+)
+
+prediction_date = latest_audit.get(
+    "prediction_date",
+    latest_audit.get("date", "Unknown")
+)
+
+outcome_date = latest_audit.get(
+    "outcome_date",
+    latest_audit.get("date", "Unknown")
+)
+
         st.markdown(
-    f"### {latest_audit['predicted']} → {audit_result}"
+            f"**Prediction Date:** {prediction_date}"
         )
-        
+
         st.markdown(
-            f"**Prediction Date:** {latest_audit['date']}"
+            f"**Outcome Date:** {outcome_date}"
         )
 
         st.markdown(
