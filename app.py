@@ -253,32 +253,32 @@ outcome_date = latest_audit.get(
     latest_audit.get("date", "Unknown")
 )
 
-        st.markdown(
+         st.markdown(
             f"**Prediction Date:** {prediction_date}"
         )
 
-        st.markdown(
+         st.markdown(
             f"**Outcome Date:** {outcome_date}"
         )
 
-        st.markdown(
+         st.markdown(
             f"**Signal:** {latest_audit['predicted']}"
         )
 
-        st.markdown(
+         st.markdown(
             f"**Actual:** {latest_audit['actual']}"
         )
 
-        st.markdown(
+         st.markdown(
             f"**Confidence:** {pred_conf:.1f}%"
         )
 
-        st.markdown(
+         st.markdown(
             f"**Market Move:** {float(latest_audit['move_pct']):+.3f}%"
         )
 
         
-        st.markdown(
+         st.markdown(
             f"**Entry:** {entry_price:.4f}"
         )
 
