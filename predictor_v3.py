@@ -305,6 +305,9 @@ log_full = LogisticRegression(max_iter=1000, random_state=42).fit(X_all_s, df["t
 rf_full = RandomForestClassifier(n_estimators=300, max_depth=8, min_samples_leaf=20, n_jobs=-1, random_state=42).fit(df[feature_cols], df["target"])
 gb_full = GradientBoostingClassifier(n_estimators=200, max_depth=3, learning_rate=0.05, random_state=42).fit(df[feature_cols], df["target"])
 
+print("PRICES LAST DATE:", prices.index[-1].date())
+print("FEATURE DF LAST DATE:", df.index[-1].date())
+
 last = df.iloc[[-1]][feature_cols]
 last_s = scaler.transform(last)
 p_log = log_full.predict_proba(last_s)[0, 1]
