@@ -243,39 +243,43 @@ with c2:
     </div>
     """, unsafe_allow_html=True)
     
-if open_trade is not None:
+audit_col, position_col = st.columns(2)
 
-    live_text = "N/A"
-    pip_text = "N/A"
+with position_col:
 
-    if current_live_price is not None:
+    if open_trade is not None:
 
-        live_text = f"{current_live_price:.4f}"
+        live_text = "N/A"
+        pip_text = "N/A"
 
-        entry_price = float(
-            open_trade["entry_price_real"]
-        )
+        if current_live_price is not None:
 
-        if str(open_trade["signal"]).upper() == "BUY":
+            live_text = f"{current_live_price:.4f}"
 
-            pips = (
-                current_live_price
-                - entry_price
-            ) * 10000
+            entry_price = float(
+                open_trade["entry_price_real"]
+            )
 
-        else:
+            if str(open_trade["signal"]).upper() == "BUY":
 
-            pips = (
-                entry_price
-                - current_live_price
-            ) * 10000
+                pips = (
+                    current_live_price
+                    - entry_price
+                ) * 10000
 
-        pip_text = f"{pips:+.1f} pips"
+            else:
 
-    st.markdown("##### OPEN POSITION")
+                pips = (
+                    entry_price
+                    - current_live_price
+                ) * 10000
 
-    st.markdown(
-        f"""
+            pip_text = f"{pips:+.1f} pips"
+
+        st.markdown("##### OPEN POSITION")
+
+        st.markdown(
+            f"""
 **Signal:** {open_trade['signal']}
 
 **Entry Price:** {float(open_trade['entry_price_real']):.4f}
@@ -286,39 +290,41 @@ if open_trade is not None:
 
 **Stake:** ${float(open_trade['stake']):.2f}
 """
-    )
+        )
 
-if latest_audit is not None:
+with audit_col:
 
-    audit_result = (
-        "✅ CORRECT"
-        if str(
-            latest_audit["correct"]
-        ).lower() == "true"
-        else "❌ WRONG"
-    )
+    if latest_audit is not None:
 
-    pred_conf = float(
-        latest_audit.get("prob_up", 0)
-    )
+        audit_result = (
+            "✅ CORRECT"
+            if str(
+                latest_audit["correct"]
+            ).lower() == "true"
+            else "❌ WRONG"
+        )
 
-    if 0 < pred_conf <= 1:
-        pred_conf *= 100
+        pred_conf = float(
+            latest_audit.get("prob_up", 0)
+        )
 
-    prediction_date = latest_audit.get(
-        "prediction_date",
-        latest_audit.get("date", "Unknown")
-    )
+        if 0 < pred_conf <= 1:
+            pred_conf *= 100
 
-    outcome_date = latest_audit.get(
-        "outcome_date",
-        latest_audit.get("date", "Unknown")
-    )
+        prediction_date = latest_audit.get(
+            "prediction_date",
+            latest_audit.get("date", "Unknown")
+        )
 
-    st.markdown("##### LAST AUDITED PREDICTION")
+        outcome_date = latest_audit.get(
+            "outcome_date",
+            latest_audit.get("date", "Unknown")
+        )
 
-    st.markdown(
-        f"""
+        st.markdown("##### LAST AUDITED PREDICTION")
+
+        st.markdown(
+            f"""
 **Result:** {latest_audit['predicted']} → {audit_result}
 
 **Actual:** {latest_audit['actual']}
@@ -331,7 +337,7 @@ if latest_audit is not None:
 
 **Outcome Date:** {outcome_date}
 """
-    )
+        )
     
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
