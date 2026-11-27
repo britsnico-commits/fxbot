@@ -315,47 +315,24 @@ if latest_audit is not None:
         latest_audit.get("date", "Unknown")
     )
 
+    st.markdown("##### LAST AUDITED PREDICTION")
+
     st.markdown(
         f"""
-<div class="card" style="padding:12px;">
+**Result:** {latest_audit['predicted']} → {audit_result}
 
-    <div class="small-label">
-        LAST AUDITED PREDICTION
-    </div>
+**Actual:** {latest_audit['actual']}
 
-    <div style="
-        font-size:20px;
-        font-weight:800;
-        margin-top:6px;
-    ">
-        {latest_audit['predicted']} → {audit_result}
-    </div>
+**Confidence:** {pred_conf:.1f}%
 
-    <div style="margin-top:8px;">
-        <b>Actual:</b> {latest_audit['actual']}
-    </div>
+**Move:** {float(latest_audit.get('move_pct', 0)):+.3f}%
 
-    <div>
-        <b>Confidence:</b> {pred_conf:.1f}%
-    </div>
+**Prediction Date:** {prediction_date}
 
-    <div>
-        <b>Move:</b> {float(latest_audit.get('move_pct', 0)):+.3f}%
-    </div>
-
-    <div>
-        <b>Prediction Date:</b> {prediction_date}
-    </div>
-
-    <div>
-        <b>Outcome Date:</b> {outcome_date}
-    </div>
-
-</div>
-""",
-        unsafe_allow_html=True
+**Outcome Date:** {outcome_date}
+"""
     )
-
+    
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
     st.markdown(f"""<div class="card stat-green"><div class="small-label">Win Rate</div><div style="font-size:32px; font-weight:900;">{win_rate:.1f}%</div><div style="font-size:12px; margin-top:4px;">{wins}W / {losses}L • {closed} closed</div></div>""", unsafe_allow_html=True)
