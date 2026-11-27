@@ -282,7 +282,7 @@ if open_trade is not None:
 
         pip_text = "N/A"
 
-    st.info(
+    st.markdown(
         f"""🟢 OPEN POSITION
 
 Signal: {open_trade['signal']}
