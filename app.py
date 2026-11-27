@@ -282,17 +282,15 @@ with position_col:
             else "#16a34a"
         )
 
-        position_bg = (
-            "#fee2e2"
-            if "-" in pip_text
-            else "#dcfce7"
-        )
+        position_bg = card_bg
+        
+        position_border = "#64748b"
 
         st.markdown(
             f"""
 <div style="
     background:{position_bg};
-    border-left:6px solid {position_color};
+    border-left:6px solid {position_border};
     padding:14px;
     border-radius:12px;
 ">
