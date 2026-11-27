@@ -16,6 +16,25 @@ SPREAD_PIPS = 0.0002  # Same as paper_trade_v2.py
 SETTLE_HOURS = 20
 PAYOUT_PCT = 0.85  # Win = +85% of stake
 
+def forex_market_open():
+
+    now = datetime.now(timezone.utc)
+
+    # Saturday
+    if now.weekday() == 5:
+        return False
+
+    # Sunday before forex reopen
+    if now.weekday() == 6 and now.hour < 22:
+        return False
+
+    # Friday after forex close
+    if now.weekday() == 4 and now.hour >= 21:
+        return False
+
+    return True
+
+
 def get_live_price():
     for _ in range(3):
         try:
@@ -84,6 +103,10 @@ for idx, row in trades.iterrows():
         age_hours = (now - ts).total_seconds() / 3600
         if age_hours < SETTLE_HOURS:
             print(f"Trade {idx} age {age_hours:.1f}h < {SETTLE_HOURS}h - not yet settling")
+            continue
+
+        if not forex_market_open():
+            print(f"Trade {idx} age {age_hours:.1f}h "f"but forex market is closed - delaying settlement")
             continue
 
         # --- Settle this trade ---
