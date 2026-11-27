@@ -85,6 +85,23 @@ sig_hist = load_csv("results/signal_history.csv")
 audit_log = load_csv("results/audit_log.csv")
 
 # =========================
+# Open Position
+# =========================
+open_trade = None
+
+if len(trades) > 0 and "status" in trades.columns:
+
+    open_rows = trades[
+        trades["status"]
+        .astype(str)
+        .str.upper()
+        .eq("OPEN")
+    ]
+
+    if len(open_rows) > 0:
+        open_trade = open_rows.iloc[-1]
+
+# =========================
 # Prediction Audit Stats
 # =========================
 pred_accuracy = 0.0
@@ -219,6 +236,51 @@ with c2:
     </div>
     """, unsafe_allow_html=True)
 
+    if open_trade is not None:
+
+        signal_color = (
+            "#10b981"
+            if str(open_trade["signal"]).upper() == "BUY"
+            else "#ef4444"
+        )
+
+        st.markdown(
+            f"""
+            <div class="card"
+                 style="border-left:6px solid {signal_color};">
+
+                <div class="small-label">
+                    OPEN POSITION
+                </div>
+
+                <div style="
+                    font-size:28px;
+                    font-weight:900;
+                    margin-top:6px;
+                ">
+                    {open_trade['signal']}
+                </div>
+
+                <div>
+                    Entry:
+                    {float(open_trade['entry_price_real']):.4f}
+                </div>
+
+                <div>
+                    Live:
+                    {float(open_trade['live_price']):.4f}
+                </div>
+
+                <div>
+                    Stake:
+                    ${float(open_trade['stake']):.2f}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
     if latest_audit is not None:
 
         audit_result = (
