@@ -236,8 +236,6 @@ with c2:
     </div>
     """, unsafe_allow_html=True)
     
-    if open_trade is not None:
-
         if open_trade is not None:
 
         st.success("OPEN POSITION")
