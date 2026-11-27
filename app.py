@@ -237,10 +237,9 @@ with c2:
     """, unsafe_allow_html=True)
     
     if open_trade is not None:
-        st.success("OPEN POSITION")
+        st.info(
+    f"""🟢 OPEN POSITION
 
-        st.markdown(
-            f"""
 **Signal:** {open_trade['signal']}
 
 **Entry:** {float(open_trade['entry_price_real']):.4f}
@@ -249,7 +248,7 @@ with c2:
 
 **Stake:** ${float(open_trade['stake']):.2f}
 """
-        )
+)
     
     if latest_audit is not None:
 
