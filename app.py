@@ -282,19 +282,18 @@ if open_trade is not None:
 
         pip_text = "N/A"
 
-    st.markdown(
-        f"""🟢 OPEN POSITION
-
-Signal: {open_trade['signal']}
-
-Entry Price: {float(open_trade['entry_price_real']):.4f}
-
-Current Market: {live_text}
-
-Position: {pip_text}
-
-Stake: ${float(open_trade['stake']):.2f}
-"""
+        st.markdown(
+        f"""
+<div class="card">
+    <div class="small-label">OPEN POSITION</div>
+    <div><b>Signal:</b> {open_trade['signal']}</div>
+    <div><b>Entry Price:</b> {float(open_trade['entry_price_real']):.4f}</div>
+    <div><b>Current Market:</b> {live_text}</div>
+    <div><b>Position:</b> {pip_text}</div>
+    <div><b>Stake:</b> ${float(open_trade['stake']):.2f}</div>
+</div>
+""",
+        unsafe_allow_html=True
     )
     
     if latest_audit is not None:
