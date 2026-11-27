@@ -238,15 +238,19 @@ with c2:
     
     if open_trade is not None:
 
-        st.success(
-            f"""OPEN POSITION
+    st.success("OPEN POSITION")
 
-Signal: {open_trade['signal']}
-Entry: {float(open_trade['entry_price_real']):.4f}
-Live: {float(open_trade['live_price']):.4f}
-Stake: ${float(open_trade['stake']):.2f}
+    st.markdown(
+        f"""
+**Signal:** {open_trade['signal']}
+
+**Entry:** {float(open_trade['entry_price_real']):.4f}
+
+**Live:** {float(open_trade['live_price']):.4f}
+
+**Stake:** ${float(open_trade['stake']):.2f}
 """
-        )
+    )
     
     if latest_audit is not None:
 
