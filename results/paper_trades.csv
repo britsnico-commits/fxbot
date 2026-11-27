@@ -1,2 +1,3 @@
-timestamp,signal,prob,price,stake,type,pnl,status,spread_cost,entry_price_real,live_price
-2026-11-26T12:14:05+00:00,BUY,60.9,1.09765,15,1d,0,OPEN,0.0002,1.09745,1.09745
+timestamp,signal,prob,price,stake,type,pnl,status,spread_cost,entry_price_real,live_price,settle_price,settle_timestamp
+2026-11-26T12:14:05+00:00,BUY,60.9,1.09765,15,1d,-15,LOSS,0.0002,1.09745,1.09745,1.09385,2026-11-27T22:59:41+00:00
+2026-11-27T22:59:41+00:00,BUY,61.1,1.09405,15,1d,0,OPEN,0.0002,1.09385,1.09385,,

@@ -1,2 +1,2 @@
 date,pred_date,prob_up,prob,signal,raw_signal,rule,adx,adx_note,price,source
-2026-11-26 23:00,2026-11-24,60.9,60.9,BUY,BUY,45/55 Threshold,26.7,"TRENDING, trade allowed (was BUY)",1.0908,PREDICTOR_FRESH
+2026-11-27 22:59,2026-11-25,61.1,61.1,BUY,BUY,45/55 Threshold,30.6,"TRENDING, trade allowed (was BUY)",1.0962,PREDICTOR_FRESH
