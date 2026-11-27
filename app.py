@@ -276,20 +276,47 @@ with position_col:
 
             pip_text = f"{pips:+.1f} pips"
 
-        st.markdown("##### OPEN POSITION")
+        position_color = (
+            "#dc2626"
+            if "-" in pip_text
+            else "#16a34a"
+        )
+
+        position_bg = (
+            "#fee2e2"
+            if "-" in pip_text
+            else "#dcfce7"
+        )
 
         st.markdown(
             f"""
-**Signal:** {open_trade['signal']}
+<div style="
+    background:{position_bg};
+    border-left:6px solid {position_color};
+    padding:14px;
+    border-radius:12px;
+">
 
-**Entry Price:** {float(open_trade['entry_price_real']):.4f}
+<b>OPEN POSITION</b><br><br>
 
-**Current Market:** {live_text}
+<b>Signal:</b> {open_trade['signal']}<br>
+<b>Entry Price:</b> {float(open_trade['entry_price_real']):.4f}<br>
+<b>Current Market:</b> {live_text}<br>
 
-**Position:** {pip_text}
+<div style="
+    font-size:22px;
+    font-weight:800;
+    color:{position_color};
+    margin-top:8px;
+">
+{pip_text}
+</div>
 
-**Stake:** ${float(open_trade['stake']):.2f}
-"""
+<b>Stake:</b> ${float(open_trade['stake']):.2f}
+
+</div>
+""",
+            unsafe_allow_html=True
         )
 
 with audit_col:
@@ -321,22 +348,53 @@ with audit_col:
             latest_audit.get("date", "Unknown")
         )
 
-        st.markdown("##### LAST AUDITED PREDICTION")
+        audit_good = (
+            "CORRECT" in audit_result
+        )
+
+        audit_color = (
+            "#16a34a"
+            if audit_good
+            else "#dc2626"
+        )
+
+        audit_bg = (
+            "#dcfce7"
+            if audit_good
+            else "#fee2e2"
+        )
 
         st.markdown(
             f"""
-**Result:** {latest_audit['predicted']} → {audit_result}
+<div style="
+    background:{audit_bg};
+    border-left:6px solid {audit_color};
+    padding:14px;
+    border-radius:12px;
+">
 
-**Actual:** {latest_audit['actual']}
+<b>LAST AUDITED PREDICTION</b><br><br>
 
-**Confidence:** {pred_conf:.1f}%
+<div style="
+    font-size:20px;
+    font-weight:800;
+    color:{audit_color};
+">
+{latest_audit['predicted']} →
+{audit_result}
+</div>
 
-**Move:** {float(latest_audit.get('move_pct', 0)):+.3f}%
+<br>
 
-**Prediction Date:** {prediction_date}
+<b>Actual:</b> {latest_audit['actual']}<br>
+<b>Confidence:</b> {pred_conf:.1f}%<br>
+<b>Move:</b> {float(latest_audit.get('move_pct', 0)):+.3f}%<br>
+<b>Prediction:</b> {prediction_date}<br>
+<b>Outcome:</b> {outcome_date}
 
-**Outcome Date:** {outcome_date}
-"""
+</div>
+""",
+            unsafe_allow_html=True
         )
     
 s1, s2, s3, s4, s5 = st.columns(5)
