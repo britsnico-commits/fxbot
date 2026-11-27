@@ -271,8 +271,8 @@ if current_live_price is not None:
 
 else:
     pip_text = "N/A"
-    
-        st.info(
+
+st.info(
     f"""🟢 OPEN POSITION
 
 Signal: {open_trade['signal']}
