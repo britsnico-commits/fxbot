@@ -98,8 +98,15 @@ if len(trades) > 0 and "status" in trades.columns:
         .eq("OPEN")
     ]
 
-    if len(open_rows) > 0:
-        open_trade = open_rows.iloc[-1]
+if len(open_rows) > 0:
+    open_trade = open_rows.iloc[-1]
+
+current_live_price = None
+
+if len(live_prices) > 0 and "price" in live_prices.columns:
+    current_live_price = float(
+        live_prices.iloc[-1]["price"]
+    )
 
 # =========================
 # Prediction Audit Stats
@@ -237,18 +244,24 @@ with c2:
     """, unsafe_allow_html=True)
     
     if open_trade is not None:
+
+        live_text = "N/A"
+
+        if current_live_price is not None:
+            live_text = f"{current_live_price:.4f}"
+
         st.info(
-    f"""🟢 OPEN POSITION
+            f"""🟢 OPEN POSITION
 
-**Signal:** {open_trade['signal']}
+Signal: {open_trade['signal']}
 
-**Entry:** {float(open_trade['entry_price_real']):.4f}
+Trade Opened: {float(open_trade['entry_price_real']):.4f}
 
-**Live:** {float(open_trade['live_price']):.4f}
+Current Market: {live_text}
 
-**Stake:** ${float(open_trade['stake']):.2f}
+Stake: ${float(open_trade['stake']):.2f}
 """
-)
+        )
     
     if latest_audit is not None:
 
