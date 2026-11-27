@@ -238,45 +238,16 @@ with c2:
 
     if open_trade is not None:
 
-        signal_color = (
-            "#10b981"
-            if str(open_trade["signal"]).upper() == "BUY"
-            else "#ef4444"
-        )
+    st.info(
+        f"""
+🟢 OPEN POSITION
 
-        st.markdown(
-    f"""
-    <div class="card"
-         style="border-left:6px solid {signal_color};">
-
-        <div class="small-label">
-            OPEN POSITION
-        </div>
-
-        <div style="
-            font-size:28px;
-            font-weight:900;
-            margin-top:6px;
-        ">
-            {open_trade['signal']}
-        </div>
-
-        <div>
-            Entry: {float(open_trade['entry_price_real']):.4f}
-        </div>
-
-        <div>
-            Live: {float(open_trade['live_price']):.4f}
-        </div>
-
-        <div>
-            Stake: ${float(open_trade['stake']):.2f}
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+Signal: {open_trade['signal']}
+Entry: {float(open_trade['entry_price_real']):.4f}
+Live: {float(open_trade['live_price']):.4f}
+Stake: ${float(open_trade['stake']):.2f}
+"""
+    )
     
     if latest_audit is not None:
 
