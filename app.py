@@ -251,33 +251,43 @@ with c2:
             live_text = f"{current_live_price:.4f}"
 pips = 0.0
 
-if current_live_price is not None:
+if open_trade is not None:
 
-    if str(open_trade["signal"]).upper() == "BUY":
+    live_text = "N/A"
 
-        pips = (
-            current_live_price
-            - float(open_trade["entry_price_real"])
-        ) * 10000
+    if current_live_price is not None:
+        live_text = f"{current_live_price:.4f}"
+
+    pips = 0.0
+
+    if current_live_price is not None:
+
+        if str(open_trade["signal"]).upper() == "BUY":
+
+            pips = (
+                current_live_price
+                - float(open_trade["entry_price_real"])
+            ) * 10000
+
+        else:
+
+            pips = (
+                float(open_trade["entry_price_real"])
+                - current_live_price
+            ) * 10000
+
+        pip_text = f"{pips:+.1f} pips"
 
     else:
 
-        pips = (
-            float(open_trade["entry_price_real"])
-            - current_live_price
-        ) * 10000
+        pip_text = "N/A"
 
-    pip_text = f"{pips:+.1f} pips"
-
-else:
-    pip_text = "N/A"
-
-st.info(
-    f"""🟢 OPEN POSITION
+    st.info(
+        f"""🟢 OPEN POSITION
 
 Signal: {open_trade['signal']}
 
-Trade Opened: {float(open_trade['entry_price_real']):.4f}
+Entry Price: {float(open_trade['entry_price_real']):.4f}
 
 Current Market: {live_text}
 
@@ -285,7 +295,7 @@ Position: {pip_text}
 
 Stake: ${float(open_trade['stake']):.2f}
 """
-)
+    )
     
     if latest_audit is not None:
 
