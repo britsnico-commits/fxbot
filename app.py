@@ -275,7 +275,7 @@ if open_trade is not None:
     st.markdown("##### OPEN POSITION")
 
     st.markdown(
-    f"""
+        f"""
 **Signal:** {open_trade['signal']}
 
 **Entry Price:** {float(open_trade['entry_price_real']):.4f}
@@ -286,7 +286,7 @@ if open_trade is not None:
 
 **Stake:** ${float(open_trade['stake']):.2f}
 """
-)
+    )
 
 if latest_audit is not None:
 
