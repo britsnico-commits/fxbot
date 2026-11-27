@@ -237,7 +237,6 @@ with c2:
     """, unsafe_allow_html=True)
     
     if open_trade is not None:
-
         st.success("OPEN POSITION")
 
         st.markdown(
