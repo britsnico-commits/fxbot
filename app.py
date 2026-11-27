@@ -243,120 +243,139 @@ with c2:
     </div>
     """, unsafe_allow_html=True)
     
-    if open_trade is not None:
-
-        live_text = "N/A"
-
-        if current_live_price is not None:
-            live_text = f"{current_live_price:.4f}"
-pips = 0.0
-
 if open_trade is not None:
 
     live_text = "N/A"
+    pip_text = "N/A"
 
     if current_live_price is not None:
+
         live_text = f"{current_live_price:.4f}"
 
-    pips = 0.0
-
-    if current_live_price is not None:
+        entry_price = float(
+            open_trade["entry_price_real"]
+        )
 
         if str(open_trade["signal"]).upper() == "BUY":
 
             pips = (
                 current_live_price
-                - float(open_trade["entry_price_real"])
+                - entry_price
             ) * 10000
 
         else:
 
             pips = (
-                float(open_trade["entry_price_real"])
+                entry_price
                 - current_live_price
             ) * 10000
 
         pip_text = f"{pips:+.1f} pips"
 
-    else:
-
-        pip_text = "N/A"
-
-        st.markdown(
+    st.markdown(
         f"""
-<div class="card">
-    <div class="small-label">OPEN POSITION</div>
-    <div><b>Signal:</b> {open_trade['signal']}</div>
-    <div><b>Entry Price:</b> {float(open_trade['entry_price_real']):.4f}</div>
-    <div><b>Current Market:</b> {live_text}</div>
-    <div><b>Position:</b> {pip_text}</div>
-    <div><b>Stake:</b> ${float(open_trade['stake']):.2f}</div>
+<div class="card" style="padding:12px;">
+
+    <div class="small-label">
+        OPEN POSITION
+    </div>
+
+    <div>
+        <b>Signal:</b> {open_trade['signal']}
+    </div>
+
+    <div>
+        <b>Entry Price:</b> {float(open_trade['entry_price_real']):.4f}
+    </div>
+
+    <div>
+        <b>Current Market:</b> {live_text}
+    </div>
+
+    <div style="
+        font-size:18px;
+        font-weight:800;
+        margin-top:6px;
+    ">
+        Position: {pip_text}
+    </div>
+
+    <div>
+        <b>Stake:</b> ${float(open_trade['stake']):.2f}
+    </div>
+
 </div>
 """,
         unsafe_allow_html=True
     )
-    
-    if latest_audit is not None:
 
-        audit_result = (
-            "✅ CORRECT"
-            if str(latest_audit["correct"]).lower() == "true"
-            else "❌ WRONG"
-        )
+if latest_audit is not None:
 
-        pred_conf = float(
-            latest_audit.get("prob_up", 0)
-        )
+    audit_result = (
+        "✅ CORRECT"
+        if str(
+            latest_audit["correct"]
+        ).lower() == "true"
+        else "❌ WRONG"
+    )
 
-        if 0 < pred_conf <= 1:
-            pred_conf *= 100
+    pred_conf = float(
+        latest_audit.get("prob_up", 0)
+    )
 
-        entry_price = float(
-            latest_audit.get("entry_price", 0)
-        )
+    if 0 < pred_conf <= 1:
+        pred_conf *= 100
 
-        st.markdown("##### LAST AUDITED PREDICTION")
+    prediction_date = latest_audit.get(
+        "prediction_date",
+        latest_audit.get("date", "Unknown")
+    )
 
-        st.markdown(
-            f"### {latest_audit['predicted']} → {audit_result}"
-        )
+    outcome_date = latest_audit.get(
+        "outcome_date",
+        latest_audit.get("date", "Unknown")
+    )
 
-        prediction_date = latest_audit.get(
-            "prediction_date",
-            latest_audit.get("date", "Unknown")
-        )
+    st.markdown(
+        f"""
+<div class="card" style="padding:12px;">
 
-        outcome_date = latest_audit.get(
-            "outcome_date",
-            latest_audit.get("date", "Unknown")
-        )
+    <div class="small-label">
+        LAST AUDITED PREDICTION
+    </div>
 
-        st.markdown(
-            f"**Prediction Date:** {prediction_date}"
-        )
+    <div style="
+        font-size:20px;
+        font-weight:800;
+        margin-top:6px;
+    ">
+        {latest_audit['predicted']} → {audit_result}
+    </div>
 
-        st.markdown(
-            f"**Outcome Date:** {outcome_date}"
-        )
+    <div style="margin-top:8px;">
+        <b>Actual:</b> {latest_audit['actual']}
+    </div>
 
-        st.markdown(
-            f"**Actual:** {latest_audit['actual']}"
-        )
+    <div>
+        <b>Confidence:</b> {pred_conf:.1f}%
+    </div>
 
+    <div>
+        <b>Move:</b> {float(latest_audit.get('move_pct', 0)):+.3f}%
+    </div>
 
-        st.markdown(
-            f"**Confidence:** {pred_conf:.1f}%"
-        )
+    <div>
+        <b>Prediction Date:</b> {prediction_date}
+    </div>
 
-        st.markdown(
-            f"**Market Move:** {float(latest_audit['move_pct']):+.3f}%"
-        )
+    <div>
+        <b>Outcome Date:</b> {outcome_date}
+    </div>
 
-        
-        st.markdown(
-            f"**Entry:** {entry_price:.4f}"
-        )
-
+</div>
+""",
+        unsafe_allow_html=True
+    )
 
 s1, s2, s3, s4, s5 = st.columns(5)
 with s1:
