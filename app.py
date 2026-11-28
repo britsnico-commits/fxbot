@@ -144,7 +144,7 @@ if len(audit_log) > 0:
         | (audit_log["prob_up"] <= 45)
     ]
 
-    conf_total = len(confident)
+        conf_total = len(confident)
 
     if conf_total > 0:
 
@@ -156,7 +156,7 @@ if len(audit_log) > 0:
             .sum()
         )
 
-        conf_accuracy = (
+         conf_accuracy = (
             conf_correct
             / conf_total
             * 100
