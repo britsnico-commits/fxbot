@@ -114,6 +114,11 @@ if len(live_prices) > 0 and "price" in live_prices.columns:
 pred_accuracy = 0.0
 pred_correct = 0
 pred_total = 0
+
+conf_accuracy = 0.0
+conf_correct = 0
+conf_total = 0
+
 latest_audit = None
 
 if len(audit_log) > 0:
@@ -131,6 +136,35 @@ if len(audit_log) > 0:
 
     if pred_total > 0:
         pred_accuracy = pred_correct / pred_total * 100
+
+    try:
+
+        confident = audit_log[
+        (audit_log["prob_up"] >= 55)
+        | (audit_log["prob_up"] <= 45)
+    ]
+
+    conf_total = len(confident)
+
+    if conf_total > 0:
+
+        conf_correct = (
+            confident["correct"]
+            .astype(str)
+            .str.lower()
+            .eq("true")
+            .sum()
+        )
+
+        conf_accuracy = (
+            conf_correct
+            / conf_total
+            * 100
+        )
+
+except Exception:
+    pass
+
 
     latest_audit = audit_log.iloc[-1]
 
@@ -395,7 +429,7 @@ with audit_col:
             unsafe_allow_html=True
         )
     
-s1, s2, s3, s4, s5 = st.columns(5)
+s1, s2, s3, s4, s5, s6 = st.columns(6)
 with s1:
     st.markdown(f"""<div class="card stat-green"><div class="small-label">Win Rate</div><div style="font-size:32px; font-weight:900;">{win_rate:.1f}%</div><div style="font-size:12px; margin-top:4px;">{wins}W / {losses}L • {closed} closed</div></div>""", unsafe_allow_html=True)
 with s2:
@@ -422,6 +456,15 @@ with s5:
 
     st.caption(
         f"{pred_correct}/{pred_total} Correct | Last: {last_result}"
+    )
+with s6:
+
+    st.metric(
+        label="Confident Accuracy",
+        value=f"{conf_accuracy:.1f}%"
+    )
+
+    st.caption(f"{conf_correct}/{conf_total} confident calls"
     )
 
 e1, e2 = st.columns([1.3, 1])
