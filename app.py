@@ -162,8 +162,8 @@ if len(audit_log) > 0:
             * 100
         )
 
-except Exception:
-    pass
+    except Exception:
+        pass
 
 
     latest_audit = audit_log.iloc[-1]
