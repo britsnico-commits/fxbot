@@ -146,7 +146,7 @@ if len(audit_log) > 0:
 
         conf_total = len(confident)
 
-    if conf_total > 0:
+     if conf_total > 0:
 
         conf_correct = (
             confident["correct"]
