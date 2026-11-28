@@ -146,9 +146,9 @@ if len(audit_log) > 0:
 
         conf_total = len(confident)
 
-     if conf_total > 0:
+        if conf_total > 0:
 
-        conf_correct = (
+            conf_correct = (
             confident["correct"]
             .astype(str)
             .str.lower()
@@ -156,7 +156,7 @@ if len(audit_log) > 0:
             .sum()
         )
 
-         conf_accuracy = (
+            conf_accuracy = (
             conf_correct
             / conf_total
             * 100
